@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.next/
+out/
+coverage/
+*.log
+.env
+.env.local
+.DS_Store
+
+.claude
+.impeccable
+/ref
+CLAUDE.md
+
+# test env
+next-env.d.ts
+*.tsbuildinfo
+
+DESIGN.md
+PRODUCT.md
