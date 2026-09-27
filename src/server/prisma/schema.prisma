@@ -823,9 +823,12 @@ model VotingConfig {
   hideResults   Boolean @default(true) @map("hide_results")
   /// Randomize ballot ordering per voter, to kill position bias.
   shuffleBallot Boolean @default(true) @map("shuffle_ballot")
-  /// Whether this event's judges / admins may also cast community votes.
-  allowJudges Boolean @default(false) @map("allow_judges")
-  allowAdmins Boolean @default(false) @map("allow_admins")
+  /// Who may cast community votes. Visitors hold no role in the event (signed in or not);
+  /// a person holding several roles may vote only if every role they hold is allowed.
+  allowVisitors     Boolean @default(true) @map("allow_visitors")
+  allowParticipants Boolean @default(true) @map("allow_participants")
+  allowJudges       Boolean @default(false) @map("allow_judges")
+  allowAdmins       Boolean @default(false) @map("allow_admins")
 
   maxVotesPerIpPerHour Int @default(60) @map("max_votes_per_ip_per_hour")
 

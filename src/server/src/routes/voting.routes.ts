@@ -24,6 +24,8 @@ const configSchema = z.object({
   creditBudget: z.number().int().min(1).max(10000).optional(),
   hideResults: z.boolean().optional(),
   shuffleBallot: z.boolean().optional(),
+  allowVisitors: z.boolean().optional(),
+  allowParticipants: z.boolean().optional(),
   allowJudges: z.boolean().optional(),
   allowAdmins: z.boolean().optional(),
   maxVotesPerIpPerHour: z.number().int().min(1).max(10000).optional(),

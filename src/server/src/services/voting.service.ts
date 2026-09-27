@@ -26,6 +26,8 @@ const DEFAULT_CONFIG = {
   creditBudget: 100,
   hideResults: true,
   shuffleBallot: true,
+  allowVisitors: true,
+  allowParticipants: true,
   allowJudges: false,
   allowAdmins: false,
   maxVotesPerIpPerHour: 60,
@@ -69,6 +71,10 @@ export async function upsertVotingConfig(
   if (changesMethod || changesBudget) {
     const lock = await votingMethodLock(ctx);
     if (lock.locked) throw conflict(lock.reason ?? "The voting method is locked.");
+  }
+  const voters = { ...pickVoterRoles(current), ...pickVoterRoles(input) };
+  if (!Object.values(voters).some(Boolean)) {
+    throw badRequest("Validation failed.", { voters: "Allow at least one group to vote." });
   }
   if (input.method === VotingMethod.QUADRATIC && changesMethod && input.creditBudget === undefined) {
     throw badRequest("Validation failed.", { creditBudget: "Set how many credits each voter receives." });
@@ -127,28 +133,60 @@ export interface VoterIdentity {
   voterEmail: string | null;
 }
 
+interface VoterRoles {
+  allowVisitors: boolean;
+  allowParticipants: boolean;
+  allowJudges: boolean;
+  allowAdmins: boolean;
+}
+
+function pickVoterRoles(config: Partial<VoterRoles>): Partial<VoterRoles> {
+  const picked: Partial<VoterRoles> = {};
+  for (const key of ["allowVisitors", "allowParticipants", "allowJudges", "allowAdmins"] as const) {
+    if (config[key] !== undefined) picked[key] = config[key];
+  }
+  return picked;
+}
+
+/**
+ * Why this caller may not vote in this event, or null if their roles allow it. Every role a
+ * person holds must be allowed: an admin who also registered as a participant is still an
+ * admin. A visitor is anyone with no role here, whether signed in or not.
+ */
+export function voterRoleProblem(
+  ctx: EventContext,
+  config: VoterRoles & { access: VotingAccess },
+): string | null {
+  if (ctx.isJudge && !config.allowJudges) return "Judges on this event may not cast community votes.";
+  if (ctx.isEventAdmin && !config.allowAdmins) return "Organizers of this event may not cast community votes.";
+  if (ctx.isParticipant && !config.allowParticipants) {
+    return "Participants in this event may not cast community votes.";
+  }
+  const visitor = !ctx.isJudge && !ctx.isEventAdmin && !ctx.isParticipant;
+  if (visitor && !config.allowVisitors) {
+    return ctx.user
+      ? "Only people taking part in this event may vote."
+      : "Only people taking part in this event may vote. Sign in first.";
+  }
+  if (!ctx.user && config.access === VotingAccess.AUTHENTICATED) return "Sign in to vote in this event.";
+  return null;
+}
+
 /**
  * Resolves who is voting under the event's access mode. The key is always
  * derived server-side: a client cannot nominate the identity it votes as.
  */
 export function resolveVoter(
   ctx: EventContext,
-  config: { access: VotingAccess; allowJudges: boolean; allowAdmins: boolean },
+  config: VoterRoles & { access: VotingAccess },
   email: string | undefined,
   ipHash: string | undefined,
 ): VoterIdentity {
-  if (ctx.user) {
-    if (ctx.isJudge && !config.allowJudges) {
-      throw forbidden("Judges on this event may not cast community votes.");
-    }
-    if (ctx.isEventAdmin && !config.allowAdmins) {
-      throw forbidden("Organizers of this event may not cast community votes.");
-    }
-    return { voterKey: `user:${ctx.user.id}`, userId: ctx.user.id, voterEmail: null };
-  }
+  const problem = voterRoleProblem(ctx, config);
+  if (problem) throw forbidden(problem);
 
-  if (config.access === VotingAccess.AUTHENTICATED) {
-    throw forbidden("Sign in to vote in this event.");
+  if (ctx.user) {
+    return { voterKey: `user:${ctx.user.id}`, userId: ctx.user.id, voterEmail: null };
   }
 
   if (config.access === VotingAccess.EMAIL_GATED) {
@@ -208,6 +246,8 @@ export async function getBallot(ctx: EventContext, email?: string, ipHash?: stri
     creditBudget: config.creditBudget,
     creditsSpent: existing.reduce((sum, v) => sum + v.credits, 0),
     hideResults: config.hideResults,
+    /** Set when this caller's roles rule them out, so the ballot page can say why up front. */
+    ineligibleReason: voterRoleProblem(ctx, config),
     submissions: ordered,
     myVotes: existing,
   };
