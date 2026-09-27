@@ -52,6 +52,34 @@ describe("event-scoped RBAC", () => {
     });
   });
 
+  describe("event windows", () => {
+    it("clears a window with null and keeps windows that were left out", async () => {
+      const created = await as(organizerA)
+        .post("/api/events")
+        .send({
+          name: "Window Event",
+          judgingOpensAt: "2030-01-01T10:00:00.000Z",
+          judgingClosesAt: "2030-01-02T10:00:00.000Z",
+        })
+        .expect(201);
+
+      const cleared = await as(organizerA)
+        .patch(`/api/events/${created.body.id}`)
+        .send({ judgingOpensAt: null })
+        .expect(200);
+      expect(cleared.body.judgingOpensAt).toBeNull();
+      expect(cleared.body.judgingClosesAt).toBe("2030-01-02T10:00:00.000Z");
+    });
+
+    it("refuses a window that closes before it opens", async () => {
+      const created = await as(organizerA).post("/api/events").send({ name: "Backwards" }).expect(201);
+      await as(organizerA)
+        .patch(`/api/events/${created.body.id}`)
+        .send({ votingOpensAt: "2030-01-02T10:00:00.000Z", votingClosesAt: "2030-01-01T10:00:00.000Z" })
+        .expect(400);
+    });
+  });
+
   describe("roles are per event, not global", () => {
     it("gives one account different roles in different events", async () => {
       await grantRole(organizerA, eventA.id, alice, "PARTICIPANT");

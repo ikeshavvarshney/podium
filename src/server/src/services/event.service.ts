@@ -137,15 +137,18 @@ export async function updateEvent(
   input: Partial<CreateEventInput> & { status?: EventStatus },
   ipHash?: string,
 ) {
+  // `null` clears a window; only a key that was left out keeps the stored value.
+  const pick = <K extends keyof EventTimeline>(key: K): EventTimeline[K] =>
+    input[key] !== undefined ? (input[key] as EventTimeline[K]) : ctx.event[key];
   const merged: EventTimeline = {
-    registrationOpensAt: input.registrationOpensAt ?? ctx.event.registrationOpensAt,
-    registrationClosesAt: input.registrationClosesAt ?? ctx.event.registrationClosesAt,
-    submissionsOpenAt: input.submissionsOpenAt ?? ctx.event.submissionsOpenAt,
-    submissionDeadline: input.submissionDeadline ?? ctx.event.submissionDeadline,
-    judgingOpensAt: input.judgingOpensAt ?? ctx.event.judgingOpensAt,
-    judgingClosesAt: input.judgingClosesAt ?? ctx.event.judgingClosesAt,
-    votingOpensAt: input.votingOpensAt ?? ctx.event.votingOpensAt,
-    votingClosesAt: input.votingClosesAt ?? ctx.event.votingClosesAt,
+    registrationOpensAt: pick("registrationOpensAt"),
+    registrationClosesAt: pick("registrationClosesAt"),
+    submissionsOpenAt: pick("submissionsOpenAt"),
+    submissionDeadline: pick("submissionDeadline"),
+    judgingOpensAt: pick("judgingOpensAt"),
+    judgingClosesAt: pick("judgingClosesAt"),
+    votingOpensAt: pick("votingOpensAt"),
+    votingClosesAt: pick("votingClosesAt"),
   };
   assertTimelineCoherent(merged);
 
