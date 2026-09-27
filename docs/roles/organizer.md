@@ -111,8 +111,8 @@ A **private** event is invisible, returning "not found", to anyone with no membe
 
 ### Judging
 
-- **Rubric**: criteria with weights that must total exactly 100 (`/events/[slug]/settings`),
-  or comparative mode with a group size. The rubric is **locked once any ballot exists**,
+- **Rubric**: criteria with weights that must total exactly 100, scored out of a number you
+  choose (5 by default) (`/events/[slug]/settings`), or comparative mode with a group size. The rubric is **locked once any ballot exists**,
   because changing a weight would silently rewrite cast ballots.
 - **Assignment** (`/events/[slug]/assign`): generate automatically (balanced across the
   panel, honouring track scope, never giving a judge their own team's project), assign or

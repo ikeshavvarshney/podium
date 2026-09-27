@@ -31,8 +31,13 @@ A typical rubric:
 | Demo quality | 15% |
 | Scope fit | 10% |
 
-A judge scores each criterion on its configured range (1 to 5 by default). The ballot
-total is:
+A judge scores each criterion on its configured range. The organizer picks the scale for the
+whole rubric (1 to 5 by default; 3, 4, 7, 10 or any whole number from 2 to 10 in the interface,
+which keeps the ballot one tap per score). Each score is first mapped onto its own range, so
+changing the scale changes how fine-grained a ballot is, never how much a criterion counts.
+The starting rubric is four criteria with the 40/25/20/15 weights of the DOGFOOD brief:
+completion and correctness, soundness and security, ease of adoption, and code quality and
+innovation. The ballot total is:
 
 ```
 weighted_total = sum(score_i * weight_i) / sum(weight_i)     normalized to 0-100
