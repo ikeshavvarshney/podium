@@ -76,7 +76,8 @@ flowchart LR
 | Method | Path | Notes |
 | --- | --- | --- |
 | GET | `/events` | Public listing, with mode/eligibility/status/theme filters. |
-| POST | `/events` | Organizer capability required. |
+| POST | `/events` | Organizer capability required. A `slug` the organizer picks is used exactly (lowercased) or refused: `400` for a bad shape or reserved word, `409` with a `suggestion` if another event has it. Without one, a unique link is derived from the name. |
+| GET | `/events/slug-availability?slug=` | Organizer capability required. `{ slug, available, reason?, suggestion? }`, for the wizard's live check. |
 | GET / PATCH | `/events/:eventId` | Private events 404 for non-members rather than 403, so their existence is not confirmed. |
 | POST | `/events/:eventId/register` | Public registration: team-or-solo, experience, skills, `REGISTRATION`-stage custom questions, agreements. |
 | `/tracks`, `/prizes`, `/members`, `/questions` | Standard CRUD, organizer/admin-only for writes. |
@@ -107,7 +108,7 @@ flowchart LR
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| GET / PUT | `/voting/config` | Access mode, method, credit budget, result hiding. |
+| GET / PUT | `/voting/config` | Access mode, method, credit budget, result hiding, and who may vote (`allowVisitors`, `allowParticipants`, `allowJudges`, `allowAdmins`; at least one must stay true). |
 | GET | `/voting/ballot` | A shuffled, per-voter-stable ballot order. |
 | POST | `/votes` | Priced and validated server-side; see `JUDGING.md` for the quadratic-voting cost function. |
 | GET | `/votes/ballots`, `/votes/results` | Organizer-only while `hideResults` is set and the window is open. |

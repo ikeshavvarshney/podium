@@ -94,7 +94,7 @@ npm test                        # runs the suites in the repo-level tests/ folde
 The suite refuses to run unless `DATABASE_URL` points at a database whose name ends in
 `_test`, so a test run cannot truncate development data.
 
-Current coverage: 320 tests across 26 files, unit and integration: authentication
+Current coverage: 339 tests across 28 files, unit and integration: authentication
 (password and passwordless), device sessions, event-scoped RBAC, cross-event isolation,
 role grants and revocation, private-event visibility, team formation and the team board,
 invite-link handling, submission lifecycle, gallery search and filter, server-side
@@ -163,8 +163,11 @@ Claimed honestly in `.dogfood.toml`: T1, T2, T3 and T4. The acceptance checker o
 - Organizer progress dashboard: who has started, who has not, coverage per project
 - Cross-judge normalization (per-judge z-score and rank-average), stored as immutable runs
 - Published results, winners page, and CSV/JSON export of everything
-- Community voting: quadratic or single, three access modes, per-voter ballot order,
-  self-vote refusal, duplicate detection in the database, hidden tallies until close
+- Community voting: quadratic or single, three access modes, a per-role choice of who may
+  vote (visitors, participants, judges, admins), per-voter ballot order, self-vote refusal,
+  duplicate detection in the database, hidden tallies until close
+- Organizer-chosen event links, checked for availability as they are typed, and Markdown
+  event descriptions with a live preview (raw HTML is never rendered)
 - Announcements per event with tags and per-user read receipts
 - Append-only audit log covering auth, roles, teams, submissions, judging, voting and
   deadline rejections

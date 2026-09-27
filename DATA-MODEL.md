@@ -147,7 +147,7 @@ erDiagram
 
 | Table | Purpose |
 | --- | --- |
-| `voting_configs` | Per event: access mode, method, credit budget, result hiding, ballot shuffling. |
+| `voting_configs` | Per event: access mode, method, credit budget, result hiding, ballot shuffling, and which roles may vote (visitors, participants, judges, admins). |
 | `votes` | One line per voter per project: weight, credits spent, hashed IP and user agent. Unique per `(event, submission, voter_key)`, so duplicate detection is a database constraint, not application code. `voter_key` is always derived server-side from the session, the gated address or the hashed client IP. |
 | `comments` | Soft-hidden via `hidden_at` rather than deleted, so moderation stays auditable. |
 
@@ -183,7 +183,9 @@ event cannot be deleted out from under it.
 
 UUIDs throughout, so ids can be generated without a round trip and are not guessable by
 enumeration. Events additionally carry a human-readable `slug`, and event routes accept
-either form.
+either form. Because of that, a slug may not look like a UUID, and `new` is reserved for the
+web client's creation page. `events.description` is stored as the organizer's Markdown
+source and rendered on read, with raw HTML dropped.
 
 ## Migrations
 

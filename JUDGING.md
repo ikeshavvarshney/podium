@@ -327,7 +327,7 @@ express how strongly they feel while making it expensive to dominate a single ra
 
 ### Changing the method
 
-The method and the credit budget decide what a ballot means, so they **lock** as soon as the poll is live (enabled and inside its window) or any ballot exists. A change is refused with a 409 and the reason, and the interface disables the controls. Other settings (hide tallies, shuffle, who may vote) stay editable. Locking after the first ballot, not only while the poll is open, is what stops a closed poll being reinterpreted.
+The method and the credit budget decide what a ballot means, so they **lock** as soon as the poll is live (enabled and inside its window) or any ballot exists. A change is refused with a 409 and the reason, and the interface disables the controls. Other settings (hide tallies, shuffle, who may vote) stay editable. Who may vote is set per role (visitors, participants, judges, admins), and a person must have every role they hold allowed, so an admin who also registered as a participant stays out while admins are excluded. Locking after the first ballot, not only while the poll is open, is what stops a closed poll being reinterpreted.
 
 ### Tallying and ties
 

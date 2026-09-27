@@ -66,12 +66,15 @@ authorization failure.
 
 ### Create and configure the event
 
-- **Create an event** (needs the organizer capability): name, tagline, description, theme
-  tags, visibility (public, unlisted or private), timezone, mode and place, team size
-  limits, eligibility, reviews per submission. Timeline dates must be coherent.
+- **Create an event** (needs the organizer capability): name, the event link (the part after
+  `/events/`, checked live against every other event as you type), tagline, a Markdown
+  description with a preview, theme tags, visibility (public, unlisted or private),
+  timezone, mode and place, team size limits, eligibility, reviews per submission.
+  Timeline dates must be coherent.
 - **Edit everything later** (`/events/[slug]/settings`): the same fields, plus status.
 - **Dates**: registration open and close, submissions open and deadline, judging open and
-  close, voting close. Each is enforced by the server clock.
+  close, voting open and close, all editable from settings. Each is enforced by the server
+  clock, and clearing one removes that limit.
 - **Tracks**, **prizes** (optionally tied to a track), **sponsor challenges**,
   **custom questions** for registration and for submissions, **rounds** and their windows,
   **FAQ**, and **people** (speakers, mentors, partners).
@@ -131,7 +134,10 @@ A **private** event is invisible, returning "not found", to anyone with no membe
 ### Community voting
 
 - Configure method (single, or quadratic with a credit budget), access mode (open link,
-  email-gated, or signed-in), whether judges and admins may vote, and the closing time.
+  email-gated, or signed-in), and **who can vote**: any mix of visitors (no role in the
+  event, signed in or not), participants, judges, and admins or organizers. Someone holding
+  several roles may vote only if every one of them is allowed, and at least one group must
+  stay allowed. The ballot page tells a refused voter why.
 - Watch standings while voting runs; the public sees them only after it closes.
 - Review flagged activity (for example shared addresses across voter keys). The platform
   flags for a human decision and blocks nothing automatically.
