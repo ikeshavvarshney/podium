@@ -7,6 +7,7 @@ import { ApiError, get, patch, put } from "@/lib/api";
 import { EventIntegrations } from "@/components/event/event-integrations";
 import { hue, HUE_NAMES } from "@/lib/hues";
 import type { EventDetail } from "@/lib/types";
+import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { Notice } from "@/components/ui/notice";
 import { STATUS_LABEL } from "@/lib/hues";
 import { ShareLink } from "@/components/event/share-link";
@@ -69,6 +70,8 @@ export default function EventSettingsPage() {
   const slug = params.slug;
 
   const [event, setEvent] = useState<EventDetail | null>(null);
+  // The description is edited as Markdown here and saved when the field loses focus.
+  const [descriptionDraft, setDescriptionDraft] = useState<string | null>(null);
   const [rubric, setRubric] = useState<Rubric | null>(null);
   const [criteria, setCriteria] = useState<Criterion[]>([]);
   const [error, setError] = useState("");
@@ -373,17 +376,17 @@ export default function EventSettingsPage() {
             />
           </label>
 
-          <label className="grid gap-[7px]">
-            <span className="text-ui font-medium">Description</span>
-            <textarea
-              className={`${FIELD} min-h-[140px] leading-[1.6]`}
-              defaultValue={event.description ?? ""}
-              disabled={!canEdit}
-              onBlur={(e) =>
-                e.target.value !== (event.description ?? "") && patchEvent({ description: e.target.value })
-              }
-            />
-          </label>
+          <MarkdownEditor
+            id="settings-description"
+            label="Description"
+            className={FIELD}
+            value={descriptionDraft ?? event.description ?? ""}
+            disabled={!canEdit}
+            onChange={setDescriptionDraft}
+            onBlur={(value) => {
+              if (value !== (event.description ?? "")) void patchEvent({ description: value });
+            }}
+          />
 
           <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
             <label className="grid gap-[7px]">

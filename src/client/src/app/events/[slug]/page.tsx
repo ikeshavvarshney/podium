@@ -16,6 +16,7 @@ import type {
 } from "@/lib/types";
 import { StatusChip } from "@/components/ui/status-chip";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Markdown } from "@/components/ui/markdown";
 
 export const dynamic = "force-dynamic";
 
@@ -318,14 +319,11 @@ export default async function EventPage({
 
       {tab === "About" && (
         <div className="mt-[clamp(24px,3.4vw,34px)] grid max-w-[68ch] gap-[18px]">
-          {(event.description ?? "No description yet.")
-            .split("\n")
-            .filter(Boolean)
-            .map((para, i) => (
-              <p key={i} className="m-0 text-prose leading-[1.7] [text-wrap:pretty]">
-                {para}
-              </p>
-            ))}
+          {event.description?.trim() ? (
+            <Markdown source={event.description} />
+          ) : (
+            <p className="m-0 text-prose leading-[1.7] text-muted">No description yet.</p>
+          )}
 
           <div className="mt-2 grid gap-2">
             <div className="eyebrow">Timeline</div>
