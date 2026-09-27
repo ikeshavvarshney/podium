@@ -62,7 +62,8 @@ flowchart LR
 | POST | `/auth/magic-link` | Issues a single-use `SignInToken`. No email is sent: the link is written to the API log for the operator, and the response is the same whether or not the address exists. |
 | POST | `/auth/magic-link/consume` | Redeems the token, opens a session. |
 | POST | `/auth/logout` | Revokes the current session. |
-| GET | `/auth/me` | The caller's own profile. |
+| GET | `/auth/session` | The web client's session check: the caller's profile and event roles, or `{ user: null }` when signed out. Never 401. |
+| GET | `/auth/me` | The caller's own profile. `401` when signed out. |
 | PATCH | `/auth/me` | Update the caller's own profile only; never accepts a user id. |
 | POST | `/auth/password` | Requires the current password; bumps `token_version`, ending every other session. |
 | GET / DELETE | `/auth/sessions`, `/auth/sessions/:sessionId` | List or revoke the caller's own devices. Revoking someone else's session id is `404`, not `403`, so it does not confirm the id exists. |

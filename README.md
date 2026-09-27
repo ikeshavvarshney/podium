@@ -94,7 +94,7 @@ npm test                        # runs the suites in the repo-level tests/ folde
 The suite refuses to run unless `DATABASE_URL` points at a database whose name ends in
 `_test`, so a test run cannot truncate development data.
 
-Current coverage: 315 tests across 26 files, unit and integration: authentication
+Current coverage: 320 tests across 26 files, unit and integration: authentication
 (password and passwordless), device sessions, event-scoped RBAC, cross-event isolation,
 role grants and revocation, private-event visibility, team formation and the team board,
 invite-link handling, submission lifecycle, gallery search and filter, server-side

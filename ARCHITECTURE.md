@@ -236,8 +236,12 @@ organizer's own server logs.
 
 ## Frontend
 
-Next.js App Router, React 19, Tailwind. Server components fetch public data directly
-from the API; client components handle session state and forms.
+Next.js App Router, React 19, Tailwind. Server components fetch from the API over the
+compose network and forward the viewer's session cookie (`lib/server-api.ts`), so a
+server-rendered event page shows each person their own role; the embeddable gallery is the
+one page that stays anonymous on purpose. Client components handle session state and forms,
+and ask `GET /auth/session`, which answers a signed-out visitor with `user: null` instead
+of a 401.
 
 The design tokens come from the prototype: semantic CSS variables (`--bg`, `--sf`,
 `--tx`, `--ac`, and so on) that flip between light and dark, mapped into Tailwind's

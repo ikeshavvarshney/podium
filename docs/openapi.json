@@ -316,6 +316,34 @@
         }
       }
     },
+    "/api/auth/session": {
+      "get": {
+        "operationId": "get_api_auth_session",
+        "tags": [
+          "auth"
+        ],
+        "summary": "GET /api/auth/session",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success. The body is JSON unless the route exports a file."
+          },
+          "400": {
+            "description": "Validation failed. `error.details` maps field names to messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or hidden from this caller."
+          }
+        }
+      }
+    },
     "/api/auth/me": {
       "get": {
         "operationId": "get_api_auth_me",
