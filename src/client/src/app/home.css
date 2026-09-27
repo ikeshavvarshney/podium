@@ -51,7 +51,12 @@
 }
 
 /* The one hand-drawn touch in the hero: a colour bar under the last word. */
+/* The one accent word in the hero: Playfair Display italic against the geometric Jost heading. */
 .home-mark {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   background-image: linear-gradient(90deg, var(--k-blue), var(--k-violet) 45%, var(--k-pink));
   background-repeat: no-repeat;
   background-size: 100% 0.13em;
