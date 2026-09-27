@@ -23,10 +23,15 @@ interface Webhook {
 }
 
 interface ImportResult {
+  created: string[];
   granted: string[];
   alreadyHeld: string[];
-  unknown: string[];
   invalid: string[];
+  teams: {
+    created: string[];
+    joined: Array<{ email: string; team: string }>;
+    skipped: Array<{ email: string; team: string; reason: string }>;
+  };
 }
 
 const ENDPOINTS: Array<{ method: string; path: string; note: string }> = [
@@ -299,6 +304,11 @@ export function EventIntegrations({ slug, canEdit }: { slug: string; canEdit: bo
               <p className="mt-1.5 text-small leading-[1.55] text-muted">
                 CSV in for rosters and judge panels; a full JSON export of everything out, any time.
               </p>
+              <p className="mt-1.5 text-small leading-[1.55] text-muted">
+                Columns <code className="font-mono">email</code>, <code className="font-mono">name</code> and, for
+                participants, <code className="font-mono">team</code>. New addresses get an account that signs in by
+                link; named teams are created as needed.
+              </p>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {(["JUDGE", "PARTICIPANT"] as const).map((r) => (
                   <button
@@ -333,8 +343,16 @@ export function EventIntegrations({ slug, canEdit }: { slug: string; canEdit: bo
               {importResult ? (
                 <div className="mt-3 font-mono text-meta leading-[1.7] text-muted">
                   {importResult.granted.length} granted · {importResult.alreadyHeld.length} already held
-                  {importResult.unknown.length ? ` · ${importResult.unknown.length} without an account` : ""}
+                  {importResult.created.length ? ` · ${importResult.created.length} accounts created` : ""}
                   {importResult.invalid.length ? ` · ${importResult.invalid.length} invalid` : ""}
+                  {importResult.teams.joined.length
+                    ? ` · ${importResult.teams.joined.length} placed on teams (${importResult.teams.created.length} new)`
+                    : ""}
+                  {importResult.teams.skipped.map((s) => (
+                    <div key={s.email}>
+                      {s.email}: not placed on {s.team}, {s.reason}
+                    </div>
+                  ))}
                 </div>
               ) : null}
             </div>

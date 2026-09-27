@@ -134,22 +134,83 @@ describe("integrations", () => {
   });
 
   describe("bulk import", () => {
-    it("grants the role to known accounts and reports the rest", async () => {
-      const csv = ["email,name", `${judge.email},Judge`, "nobody@example.test,Nobody", "not-an-email,Bad"].join("\n");
+    it("grants the role, creates accounts for new addresses and reports invalid rows", async () => {
+      const csv = ["email,name", `${judge.email},Judge`, "newjudge@example.test,New Judge", "not-an-email,Bad"].join("\n");
       const res = await as(organizer)
         .post(`/api/events/${event.id}/import/roster`)
         .send({ role: "JUDGE", csv })
         .expect(200);
 
-      expect(res.body.granted).toEqual([judge.email]);
-      expect(res.body.unknown).toEqual(["nobody@example.test"]);
+      expect(res.body.granted).toEqual([judge.email, "newjudge@example.test"]);
+      expect(res.body.created).toEqual(["newjudge@example.test"]);
       expect(res.body.invalid).toEqual(["not-an-email"]);
+
+      const created = await prisma.user.findUniqueOrThrow({
+        where: { email: "newjudge@example.test" },
+        include: { memberships: { where: { eventId: event.id } } },
+      });
+      expect(created.name).toBe("New Judge");
+      expect(created.memberships.map((m) => m.role)).toEqual(["JUDGE"]);
 
       const again = await as(organizer)
         .post(`/api/events/${event.id}/import/roster`)
         .send({ role: "JUDGE", csv: judge.email })
         .expect(200);
       expect(again.body.alreadyHeld).toEqual([judge.email]);
+      expect(again.body.created).toEqual([]);
+    });
+
+    it("gives created accounts no password anyone knows", async () => {
+      await anon()
+        .post("/api/auth/login")
+        .send({ email: "newjudge@example.test", password: "New Judge" })
+        .expect(401);
+      const user = await prisma.user.findUniqueOrThrow({ where: { email: "newjudge@example.test" } });
+      expect(user.passwordHash).toMatch(/^\$argon2id\$/);
+    });
+
+    it("places participants on named teams, creating teams and respecting the size cap", async () => {
+      const small = await createEvent(organizer, { name: "Roster Event", maxTeamSize: 2 });
+      const csv = [
+        "name,email,team",
+        '"Lovelace, Ada",ada@roster.test,Analytical',
+        "Grace,grace@roster.test,Analytical",
+        "Third,third@roster.test,Analytical",
+        "Solo,solo@roster.test,",
+        "Kay,kay@roster.test,Smalltalk",
+      ].join("\n");
+      const res = await as(organizer)
+        .post(`/api/events/${small.id}/import/roster`)
+        .send({ role: "PARTICIPANT", csv })
+        .expect(200);
+
+      expect(res.body.created).toHaveLength(5);
+      expect(res.body.teams.created).toEqual(["Analytical", "Smalltalk"]);
+      expect(res.body.teams.joined).toEqual([
+        { email: "ada@roster.test", team: "Analytical" },
+        { email: "grace@roster.test", team: "Analytical" },
+        { email: "kay@roster.test", team: "Smalltalk" },
+      ]);
+      expect(res.body.teams.skipped).toEqual([
+        { email: "third@roster.test", team: "Analytical", reason: "team is full (maximum 2)" },
+      ]);
+
+      const team = await prisma.team.findFirstOrThrow({
+        where: { eventId: small.id, name: "Analytical" },
+        include: { members: { include: { user: true }, orderBy: { joinedAt: "asc" } } },
+      });
+      expect(team.members.map((m) => [m.user.name, m.role])).toEqual([
+        ["Lovelace, Ada", "OWNER"],
+        ["Grace", "MEMBER"],
+      ]);
+
+      const rerun = await as(organizer)
+        .post(`/api/events/${small.id}/import/roster`)
+        .send({ role: "PARTICIPANT", csv: "email,team\nada@roster.test,Smalltalk" })
+        .expect(200);
+      expect(rerun.body.teams.skipped).toEqual([
+        { email: "ada@roster.test", team: "Smalltalk", reason: 'already on team "Analytical"' },
+      ]);
     });
 
     it("refuses import to non-admins and refuses the admin role", async () => {
