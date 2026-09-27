@@ -2,7 +2,7 @@ import Link from "next/link";
 import { EventCard } from "@/components/event/event-card";
 import { OrbitMark } from "@/components/event/rubric-diagram";
 import { SortSelect } from "@/components/event/sort-select";
-import { get } from "@/lib/api";
+import { serverGet } from "@/lib/server-api";
 import { STATUS_LABEL } from "@/lib/hues";
 import type { EventSummary, Paginated } from "@/lib/types";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -61,7 +61,7 @@ export default async function DiscoverPage({
   let data: Paginated<EventSummary> = { items: [], total: 0, take: 0, skip: 0 };
   let failed = false;
   try {
-    data = await get<Paginated<EventSummary>>(`/events?${apiParams.toString()}`);
+    data = await serverGet<Paginated<EventSummary>>(`/events?${apiParams.toString()}`);
   } catch {
     failed = true;
   }

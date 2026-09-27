@@ -45,7 +45,7 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
-export const get = <T>(path: string) => api<T>(path);
+export const get = <T>(path: string, init?: RequestInit) => api<T>(path, init);
 export const post = <T>(path: string, data?: unknown) =>
   api<T>(path, { method: "POST", body: data === undefined ? undefined : JSON.stringify(data) });
 export const put = <T>(path: string, data: unknown) =>

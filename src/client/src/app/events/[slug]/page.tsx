@@ -4,7 +4,7 @@ import { Countdown } from "@/components/event/countdown";
 import { ParticipantPanel } from "@/components/event/participant-panel";
 import { GalleryGrid } from "@/components/event/gallery-grid";
 import { GalleryToolbar, galleryHref, type GalleryFacets, type GallerySearch } from "@/components/event/gallery-toolbar";
-import { get } from "@/lib/api";
+import { serverGet } from "@/lib/server-api";
 import { coverHue, hue, STATUS_HUE, STATUS_LABEL } from "@/lib/hues";
 import type {
   Challenge,
@@ -92,7 +92,7 @@ export default async function EventPage({
 
   let event: EventDetail;
   try {
-    event = await get<EventDetail>(`/events/${slug}`);
+    event = await serverGet<EventDetail>(`/events/${slug}`);
   } catch {
     notFound();
   }
@@ -105,22 +105,22 @@ export default async function EventPage({
     if (gallerySearch.gtag) query.set("tag", gallerySearch.gtag);
     if (gallerySearch.gsort) query.set("sort", gallerySearch.gsort);
     const qs = query.toString();
-    gallery = await get<Paginated<SubmissionCard>>(`/events/${slug}/submissions${qs ? `?${qs}` : ""}`);
+    gallery = await serverGet<Paginated<SubmissionCard>>(`/events/${slug}/submissions${qs ? `?${qs}` : ""}`);
   } catch {
     // Gallery is optional context.
   }
 
-  const galleryFacets = await get<GalleryFacets>(`/events/${slug}/submissions/facets`).catch(
+  const galleryFacets = await serverGet<GalleryFacets>(`/events/${slug}/submissions/facets`).catch(
     () => ({ total: gallery.total, tags: [], tracks: [] }) as GalleryFacets,
   );
   const galleryFiltered = Boolean(gallerySearch.gq || gallerySearch.gtrack || gallerySearch.gtag);
 
   const [rounds, faq, people, partners, challenges] = await Promise.all([
-    get<Round[]>(`/events/${slug}/rounds`).catch(() => [] as Round[]),
-    get<FaqItem[]>(`/events/${slug}/faq`).catch(() => [] as FaqItem[]),
-    get<EventPerson[]>(`/events/${slug}/people`).catch(() => [] as EventPerson[]),
-    get<Partner[]>(`/events/${slug}/partners`).catch(() => [] as Partner[]),
-    get<Challenge[]>(`/events/${slug}/challenges`).catch(() => [] as Challenge[]),
+    serverGet<Round[]>(`/events/${slug}/rounds`).catch(() => [] as Round[]),
+    serverGet<FaqItem[]>(`/events/${slug}/faq`).catch(() => [] as FaqItem[]),
+    serverGet<EventPerson[]>(`/events/${slug}/people`).catch(() => [] as EventPerson[]),
+    serverGet<Partner[]>(`/events/${slug}/partners`).catch(() => [] as Partner[]),
+    serverGet<Challenge[]>(`/events/${slug}/challenges`).catch(() => [] as Challenge[]),
   ]);
 
   const cover = hue(coverHue(event.name));
