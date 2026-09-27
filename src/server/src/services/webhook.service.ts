@@ -1,18 +1,34 @@
 import { createHmac, randomBytes } from "node:crypto";
 import { prisma } from "../db.js";
 import { badRequest, notFound } from "../lib/errors.js";
+import { AuditAction, type AuditActionKey } from "./audit.service.js";
 import type { EventContext } from "./authorization.service.js";
 
-/** The audit actions a webhook may subscribe to. */
+/** Account-level actions carry no event, so no event's webhook can hear them. */
+const ACCOUNT_ACTIONS = new Set<AuditActionKey>([
+  AuditAction.USER_REGISTERED,
+  AuditAction.USER_LOGGED_IN,
+  AuditAction.USER_LOGIN_FAILED,
+  AuditAction.USER_LOGGED_OUT,
+  AuditAction.USER_PROFILE_UPDATED,
+  AuditAction.USER_PASSWORD_CHANGED,
+  AuditAction.USER_SESSIONS_REVOKED,
+  AuditAction.SIGN_IN_LINK_ISSUED,
+]);
+
+/** Subscribes a hook to every action, including ones added after it was created. */
+export const ALL_EVENTS = "*";
+
+/**
+ * What a webhook may subscribe to: every event-scoped audit action. Webhooks hang off the
+ * audit log, so anything an organizer, judge or participant does in an event is both
+ * recorded and deliverable, and a new audited action is subscribable without touching this
+ * file.
+ */
 export const WEBHOOK_EVENTS = [
-  "SUBMISSION_SUBMITTED",
-  "SCORE_SUBMITTED",
-  "JUDGE_ASSIGNED",
-  "RESULTS_PUBLISHED",
-  "EVENT_UPDATE_POSTED",
-  "VOTE_CAST",
-  "ROUND_CHANGED",
-] as const;
+  ALL_EVENTS,
+  ...Object.values(AuditAction).filter((action) => !ACCOUNT_ACTIONS.has(action)),
+] as [string, ...string[]];
 
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
@@ -100,7 +116,7 @@ interface DispatchInput {
  */
 export async function dispatchWebhooks(input: DispatchInput): Promise<void> {
   const hooks = await prisma.webhook.findMany({
-    where: { eventId: input.eventId, active: true, events: { has: input.action } },
+    where: { eventId: input.eventId, active: true, events: { hasSome: [input.action, ALL_EVENTS] } },
   });
   if (hooks.length === 0) return;
 

@@ -119,6 +119,36 @@ describe("integrations", () => {
       expect(received.length).toBe(before);
     });
 
+    it("offers every event-scoped action, and no account-level one", async () => {
+      const res = await as(organizer).get(`/api/events/${event.id}/webhooks`).expect(200);
+      expect(res.body.available[0]).toBe("*");
+      expect(res.body.available).toEqual(
+        expect.arrayContaining(["FAQ_CHANGED", "QUESTION_CHANGED", "ASSIGNMENT_SKIPPED", "JOIN_REQUESTED", "ACCESS_DENIED"]),
+      );
+      expect(res.body.available).not.toContain("USER_LOGGED_IN");
+    });
+
+    it("delivers actions a wildcard hook never named", async () => {
+      await as(organizer)
+        .post(`/api/events/${event.id}/webhooks`)
+        .send({ url: receiverUrl, events: ["*"] })
+        .expect(201);
+      const before = received.length;
+
+      await as(organizer)
+        .post(`/api/events/${event.id}/faq`)
+        .send({ question: "Is there food?", answer: "Yes." })
+        .expect(201);
+      await as(organizer)
+        .post(`/api/events/${event.id}/questions`)
+        .send({ prompt: "Which stack?" })
+        .expect(201);
+
+      const types = () => received.slice(before).map((r) => r.headers["x-podium-event"]);
+      await waitFor(() => types().includes("FAQ_CHANGED") && types().includes("QUESTION_CHANGED"));
+      expect(types()).toEqual(expect.arrayContaining(["FAQ_CHANGED", "QUESTION_CHANGED"]));
+    });
+
     it("records a failed delivery instead of failing the request", async () => {
       await as(organizer)
         .post(`/api/events/${event.id}/webhooks`)

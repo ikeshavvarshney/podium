@@ -22,6 +22,8 @@ interface Webhook {
   deliveries: Delivery[];
 }
 
+const eventLabel = (evt: string) => (evt === "*" ? "all events" : evt.toLowerCase().replace(/_/g, "."));
+
 interface ImportResult {
   created: string[];
   granted: string[];
@@ -173,25 +175,31 @@ export function EventIntegrations({ slug, canEdit }: { slug: string; canEdit: bo
           <p className="mt-1.5 max-w-[62ch] text-small leading-[1.6] text-muted">
             Each delivery is a JSON POST signed with HMAC-SHA256 in <code className="font-mono">x-podium-signature</code>.
             Deliveries run after the action completes, so a slow receiver never slows an organizer down.
+            Every audited action in this event can be subscribed to; <code className="font-mono">all events</code>{" "}
+            also covers actions added in later versions.
           </p>
           <div className="mt-2.5 flex flex-wrap gap-[7px]">
             {available.map((evt) => {
               const on = hookEvents.includes(evt);
+              const coveredByAll = evt !== "*" && hookEvents.includes("*");
               return (
                 <button
                   key={evt}
                   type="button"
+                  disabled={coveredByAll}
                   onClick={() =>
-                    setHookEvents((prev) => (on ? prev.filter((x) => x !== evt) : [...prev, evt]))
+                    setHookEvents((prev) =>
+                      on ? prev.filter((x) => x !== evt) : evt === "*" ? ["*"] : [...prev, evt],
+                    )
                   }
-                  className="rounded-md border px-2.5 py-[5px] font-mono text-meta [transition:background-color_200ms,border-color_200ms]"
+                  className="rounded-md border px-2.5 py-[5px] font-mono text-meta [transition:background-color_200ms,border-color_200ms] disabled:opacity-40"
                   style={{
                     background: on ? "var(--acs)" : "var(--el)",
                     borderColor: on ? "var(--ac)" : "var(--ln)",
                     color: on ? "var(--act)" : "var(--tx)",
                   }}
                 >
-                  {evt.toLowerCase().replace(/_/g, ".")}
+                  {eventLabel(evt)}
                 </button>
               );
             })}
@@ -242,7 +250,7 @@ export function EventIntegrations({ slug, canEdit }: { slug: string; canEdit: bo
                   </button>
                 </div>
                 <div className="mt-2 font-mono text-label text-muted">
-                  {hook.events.map((e) => e.toLowerCase().replace(/_/g, ".")).join(" · ")}
+                  {hook.events.map(eventLabel).join(" · ")}
                 </div>
                 {hook.deliveries.length ? (
                   <div className="mt-2 grid gap-1">
