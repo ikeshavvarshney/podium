@@ -31,7 +31,7 @@ csv_export   = "/api/events/sample-hack-2026/export/scores.csv"
 
 [project]
 license = "MIT"
-repository = ""
+repository = "https://github.com/ikeshavvarshney/podium"
 web = "http://localhost:3000"
 seed_password = "podium-demo-2026"
 bonus = "normalization-proof"   # docs/normalization-proof.md; also present: docs/openapi.json, docs/SECURITY.md threat model
