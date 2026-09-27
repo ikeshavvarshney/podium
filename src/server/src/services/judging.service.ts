@@ -394,14 +394,26 @@ export async function skipAssignment(
   judge: AuthUser,
   submissionId: string,
   reason: string | null,
+  ipHash?: string,
 ) {
   assertJudgingOpen(ctx);
   const assignment = await requireOwnAssignment(ctx, judge.id, submissionId);
 
-  return prisma.judgeAssignment.update({
+  const skipped = await prisma.judgeAssignment.update({
     where: { id: assignment.id },
     data: { skippedAt: new Date(), skipReason: reason },
   });
+  await recordAudit({
+    action: AuditAction.ASSIGNMENT_SKIPPED,
+    eventId: ctx.event.id,
+    actorId: judge.id,
+    targetType: "submission",
+    targetId: submissionId,
+    summary: `${judge.name} skipped an assigned submission`,
+    metadata: reason ? { reason } : {},
+    ipHash,
+  });
+  return skipped;
 }
 
 /** A judge may read one of their own ballots back. Never anyone else's. */

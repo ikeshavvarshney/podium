@@ -148,11 +148,26 @@ export async function postListing(ctx: EventContext, user: AuthUser, input: List
     },
     update: { pitch: input.pitch, skills: input.skills ?? [], trackId: input.trackId ?? null, active: true },
   });
+  await recordAudit({
+    action: AuditAction.BOARD_LISTING_POSTED,
+    eventId: ctx.event.id,
+    actorId: user.id,
+    targetType: "user",
+    targetId: user.id,
+    summary: `${user.name} posted a looking-for-a-team listing`,
+    ipHash,
+  });
   return { kind: "SEEKER" as const, id: listing.id };
 }
 
 /** "Ask to join": a teamless participant asks a team to take them. */
-export async function askToJoin(ctx: EventContext, user: AuthUser, teamId: string, message?: string) {
+export async function askToJoin(
+  ctx: EventContext,
+  user: AuthUser,
+  teamId: string,
+  message?: string,
+  ipHash?: string,
+) {
   assertBoardOpen(ctx);
   if (!ctx.isParticipant) throw forbidden("Register for this event before asking to join a team.");
   if (await myTeam(ctx.event.id, user.id)) throw conflict("You are already on a team for this event.");
@@ -165,7 +180,7 @@ export async function askToJoin(ctx: EventContext, user: AuthUser, teamId: strin
   });
   if (pending) throw conflict("You already have a pending request with this team.");
 
-  return prisma.joinRequest.create({
+  const request = await prisma.joinRequest.create({
     data: {
       eventId: ctx.event.id,
       teamId,
@@ -174,10 +189,27 @@ export async function askToJoin(ctx: EventContext, user: AuthUser, teamId: strin
       message: message ?? null,
     },
   });
+  await recordAudit({
+    action: AuditAction.JOIN_REQUESTED,
+    eventId: ctx.event.id,
+    actorId: user.id,
+    targetType: "team",
+    targetId: teamId,
+    summary: `${user.name} asked to join team "${team.name}"`,
+    metadata: { direction: JoinDirection.ASK, requestId: request.id },
+    ipHash,
+  });
+  return request;
 }
 
 /** "Invite to your team": a team owner invites a listed person. */
-export async function invitePerson(ctx: EventContext, user: AuthUser, userId: string, message?: string) {
+export async function invitePerson(
+  ctx: EventContext,
+  user: AuthUser,
+  userId: string,
+  message?: string,
+  ipHash?: string,
+) {
   assertBoardOpen(ctx);
   const team = await myTeam(ctx.event.id, user.id);
   if (!team || !team.members.some((m) => m.userId === user.id && m.role === TeamRole.OWNER)) {
@@ -198,7 +230,7 @@ export async function invitePerson(ctx: EventContext, user: AuthUser, userId: st
   });
   if (pending) throw conflict("There is already a pending request between your team and that person.");
 
-  return prisma.joinRequest.create({
+  const request = await prisma.joinRequest.create({
     data: {
       eventId: ctx.event.id,
       teamId: team.id,
@@ -207,6 +239,17 @@ export async function invitePerson(ctx: EventContext, user: AuthUser, userId: st
       message: message ?? null,
     },
   });
+  await recordAudit({
+    action: AuditAction.JOIN_REQUESTED,
+    eventId: ctx.event.id,
+    actorId: user.id,
+    targetType: "team",
+    targetId: team.id,
+    summary: `Team "${team.name}" invited a listed participant`,
+    metadata: { direction: JoinDirection.INVITE, requestId: request.id, userId },
+    ipHash,
+  });
+  return request;
 }
 
 /** Requests that involve the caller, in both directions. */
@@ -258,20 +301,27 @@ export async function decideRequest(
   const mayDecide = request.direction === JoinDirection.ASK ? isOwner : request.userId === user.id;
   const mayWithdraw = request.direction === JoinDirection.ASK ? request.userId === user.id : isOwner;
 
-  if (!accept && mayWithdraw && !mayDecide) {
-    return prisma.joinRequest.update({
+  const close = async (status: typeof JoinStatus.WITHDRAWN | typeof JoinStatus.DECLINED) => {
+    const closed = await prisma.joinRequest.update({
       where: { id: request.id },
-      data: { status: JoinStatus.WITHDRAWN, decidedAt: new Date() },
+      data: { status, decidedAt: new Date() },
     });
-  }
-  if (!mayDecide) throw forbidden("Only the other side of this request can answer it.");
+    await recordAudit({
+      action: AuditAction.JOIN_REQUEST_DECIDED,
+      eventId: ctx.event.id,
+      actorId: user.id,
+      targetType: "team",
+      targetId: request.teamId,
+      summary: `A board request with team "${request.team.name}" was ${status.toLowerCase()}`,
+      metadata: { direction: request.direction, status, requestId: request.id },
+      ipHash,
+    });
+    return closed;
+  };
 
-  if (!accept) {
-    return prisma.joinRequest.update({
-      where: { id: request.id },
-      data: { status: JoinStatus.DECLINED, decidedAt: new Date() },
-    });
-  }
+  if (!accept && mayWithdraw && !mayDecide) return close(JoinStatus.WITHDRAWN);
+  if (!mayDecide) throw forbidden("Only the other side of this request can answer it.");
+  if (!accept) return close(JoinStatus.DECLINED);
 
   assertBoardOpen(ctx);
 

@@ -62,8 +62,8 @@ router.post(
     const ctx = eventContext(req);
     const user = currentUser(req);
     const request = req.body.teamId
-      ? await askToJoin(ctx, user, req.body.teamId, req.body.message)
-      : await invitePerson(ctx, user, req.body.userId, req.body.message);
+      ? await askToJoin(ctx, user, req.body.teamId, req.body.message, req.ipHash)
+      : await invitePerson(ctx, user, req.body.userId, req.body.message, req.ipHash);
     res.status(201).json(request);
   }),
 );

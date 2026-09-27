@@ -11,6 +11,7 @@ import {
   requireEventAdmin,
 } from "../middleware/event-context.js";
 import { validate } from "../middleware/validate.js";
+import { AuditAction, recordAudit } from "../services/audit.service.js";
 
 const router: Router = Router({ mergeParams: true });
 
@@ -45,8 +46,18 @@ router.post(
   requireEventAdmin,
   validate({ body: questionSchema }),
   asyncHandler(async (req, res) => {
+    const ctx = eventContext(req);
     const question = await prisma.customQuestion.create({
-      data: { eventId: eventContext(req).event.id, ...req.body },
+      data: { eventId: ctx.event.id, ...req.body },
+    });
+    await recordAudit({
+      action: AuditAction.QUESTION_CHANGED,
+      eventId: ctx.event.id,
+      actorId: ctx.user?.id ?? null,
+      targetType: "question",
+      targetId: question.id,
+      summary: `Question added: ${question.prompt}`,
+      ipHash: req.ipHash,
     });
     res.status(201).json(question);
   }),
@@ -59,13 +70,22 @@ router.patch(
   requireEventAdmin,
   validate({ body: questionSchema.partial() }),
   asyncHandler(async (req, res) => {
+    const ctx = eventContext(req);
     const existing = await prisma.customQuestion.findFirst({
-      where: { id: req.params.questionId as string, eventId: eventContext(req).event.id },
+      where: { id: req.params.questionId as string, eventId: ctx.event.id },
     });
     if (!existing) throw notFound("Question not found.");
-    res.json(
-      await prisma.customQuestion.update({ where: { id: existing.id }, data: req.body }),
-    );
+    const question = await prisma.customQuestion.update({ where: { id: existing.id }, data: req.body });
+    await recordAudit({
+      action: AuditAction.QUESTION_CHANGED,
+      eventId: ctx.event.id,
+      actorId: ctx.user?.id ?? null,
+      targetType: "question",
+      targetId: question.id,
+      summary: `Question edited: ${question.prompt}`,
+      ipHash: req.ipHash,
+    });
+    res.json(question);
   }),
 );
 
@@ -75,11 +95,21 @@ router.delete(
   asyncHandler(loadEventContext),
   requireEventAdmin,
   asyncHandler(async (req, res) => {
+    const ctx = eventContext(req);
     const existing = await prisma.customQuestion.findFirst({
-      where: { id: req.params.questionId as string, eventId: eventContext(req).event.id },
+      where: { id: req.params.questionId as string, eventId: ctx.event.id },
     });
     if (!existing) throw notFound("Question not found.");
     await prisma.customQuestion.delete({ where: { id: existing.id } });
+    await recordAudit({
+      action: AuditAction.QUESTION_CHANGED,
+      eventId: ctx.event.id,
+      actorId: ctx.user?.id ?? null,
+      targetType: "question",
+      targetId: existing.id,
+      summary: `Question deleted: ${existing.prompt}`,
+      ipHash: req.ipHash,
+    });
     res.status(204).end();
   }),
 );

@@ -13,6 +13,7 @@ import {
 } from "../middleware/event-context.js";
 import { writeRateLimit } from "../middleware/rate-limit.js";
 import { validate } from "../middleware/validate.js";
+import { AuditAction, recordAuditSafe } from "../services/audit.service.js";
 import {
   assignJudgeManually,
   clearUnscoredAssignments,
@@ -262,6 +263,7 @@ router.post(
         currentUser(req),
         req.params.submissionId as string,
         req.body.reason ?? null,
+        req.ipHash,
       ),
     );
   }),
@@ -327,7 +329,19 @@ router.get(
   asyncHandler(loadEventContext),
   requireJudge,
   asyncHandler(async (req, res) => {
-    res.json(await buildJudgeRecord(eventContext(req), currentUser(req).id));
+    const ctx = eventContext(req);
+    const judge = currentUser(req);
+    const record = await buildJudgeRecord(ctx, judge.id);
+    recordAuditSafe({
+      action: AuditAction.JUDGE_RECORD_ISSUED,
+      eventId: ctx.event.id,
+      actorId: judge.id,
+      targetType: "judge",
+      targetId: judge.id,
+      summary: `${judge.name} drew their signed participation record`,
+      ipHash: req.ipHash,
+    });
+    res.json(record);
   }),
 );
 

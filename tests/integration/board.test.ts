@@ -107,4 +107,27 @@ describe("team formation board", () => {
     });
     await as(owner).post(`/api/events/${event.id}/board/requests/${pending.id}/accept`).expect(409);
   });
+
+  it("audits listings, requests, declines and ownership transfer", async () => {
+    const pending = await prisma.joinRequest.findFirstOrThrow({
+      where: { teamId, userId: other.id, status: "PENDING" },
+    });
+    await as(owner).post(`/api/events/${event.id}/board/requests/${pending.id}/decline`).expect(200);
+    await as(owner)
+      .post(`/api/events/${event.id}/teams/${teamId}/transfer`)
+      .send({ userId: seeker.id })
+      .expect(200);
+
+    const actions = (
+      await prisma.auditLog.findMany({ where: { eventId: event.id }, select: { action: true } })
+    ).map((a) => a.action);
+    expect(actions).toEqual(
+      expect.arrayContaining([
+        "BOARD_LISTING_POSTED",
+        "JOIN_REQUESTED",
+        "JOIN_REQUEST_DECIDED",
+        "TEAM_OWNER_TRANSFERRED",
+      ]),
+    );
+  });
 });

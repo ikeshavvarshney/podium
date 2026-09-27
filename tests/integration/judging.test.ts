@@ -466,6 +466,24 @@ describe("judging: rubric, assignment, scoring and isolation", () => {
     });
   });
 
+  describe("skipping", () => {
+    it("records a judge's skip in the audit trail, with the reason", async () => {
+      const assignment = await prisma.judgeAssignment.findFirstOrThrow({
+        where: { eventId: event.id, judgeId: judgeB.id },
+      });
+      await as(judgeB)
+        .post(`/api/events/${event.id}/judge/skip/${assignment.submissionId}`)
+        .send({ reason: "Conflict of interest" })
+        .expect(200);
+
+      const entry = await prisma.auditLog.findFirstOrThrow({
+        where: { eventId: event.id, action: "ASSIGNMENT_SKIPPED" },
+      });
+      expect(entry.actorId).toBe(judgeB.id);
+      expect(entry.metadata).toEqual({ reason: "Conflict of interest" });
+    });
+  });
+
   describe("results", () => {
     it("refuses the preview to a judge", async () => {
       await as(judgeA).get(`/api/events/${event.id}/results/preview`).expect(403);

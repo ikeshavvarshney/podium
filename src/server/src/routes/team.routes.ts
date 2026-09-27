@@ -8,6 +8,7 @@ import { currentUser, requireAuth } from "../middleware/auth.js";
 import { eventContext, loadEventContext } from "../middleware/event-context.js";
 import { writeRateLimit } from "../middleware/rate-limit.js";
 import { validate } from "../middleware/validate.js";
+import { AuditAction, recordAudit } from "../services/audit.service.js";
 import {
   assertTeamMember,
   assertTeamOwner,
@@ -185,6 +186,16 @@ router.post(
         data: { role: "OWNER" },
       }),
     ]);
+    await recordAudit({
+      action: AuditAction.TEAM_OWNER_TRANSFERRED,
+      eventId: ctx.event.id,
+      actorId: actor.id,
+      targetType: "team",
+      targetId: team.id,
+      summary: `${actor.name} handed ownership of "${team.name}" to ${target.user.name}`,
+      metadata: { from: actor.id, to: target.userId },
+      ipHash: req.ipHash,
+    });
 
     res.json(await loadTeamInEvent(ctx.event.id, team.id));
   }),

@@ -159,11 +159,19 @@ faqRoutes.post(
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
     const count = await prisma.faqItem.count({ where: { eventId: ctx.event.id } });
-    res.status(201).json(
-      await prisma.faqItem.create({
-        data: { ...req.body, eventId: ctx.event.id, position: req.body.position ?? count },
-      }),
-    );
+    const item = await prisma.faqItem.create({
+      data: { ...req.body, eventId: ctx.event.id, position: req.body.position ?? count },
+    });
+    await recordAudit({
+      action: AuditAction.FAQ_CHANGED,
+      eventId: ctx.event.id,
+      actorId: ctx.user?.id ?? null,
+      targetType: "faq",
+      targetId: item.id,
+      summary: `FAQ entry added: ${item.question}`,
+      ipHash: req.ipHash,
+    });
+    res.status(201).json(item);
   }),
 );
 
@@ -179,7 +187,17 @@ faqRoutes.patch(
       where: { id: req.params.faqId as string, eventId: ctx.event.id },
     });
     if (!existing) throw notFound("That entry does not exist in this event.");
-    res.json(await prisma.faqItem.update({ where: { id: existing.id }, data: req.body }));
+    const item = await prisma.faqItem.update({ where: { id: existing.id }, data: req.body });
+    await recordAudit({
+      action: AuditAction.FAQ_CHANGED,
+      eventId: ctx.event.id,
+      actorId: ctx.user?.id ?? null,
+      targetType: "faq",
+      targetId: item.id,
+      summary: `FAQ entry edited: ${item.question}`,
+      ipHash: req.ipHash,
+    });
+    res.json(item);
   }),
 );
 
@@ -195,6 +213,15 @@ faqRoutes.delete(
     });
     if (!existing) throw notFound("That entry does not exist in this event.");
     await prisma.faqItem.delete({ where: { id: existing.id } });
+    await recordAudit({
+      action: AuditAction.FAQ_CHANGED,
+      eventId: ctx.event.id,
+      actorId: ctx.user?.id ?? null,
+      targetType: "faq",
+      targetId: existing.id,
+      summary: `FAQ entry deleted: ${existing.question}`,
+      ipHash: req.ipHash,
+    });
     res.status(204).end();
   }),
 );
