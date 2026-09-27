@@ -107,8 +107,12 @@ describe("integrations", () => {
       expect(delivery!.headers["x-podium-signature"]).toBe(`sha256=${signBody(secret, delivery!.body)}`);
       expect(JSON.parse(delivery!.body).eventId).toBe(event.id);
 
-      await waitFor(() => false, 150);
-      const logged = await prisma.webhookDelivery.findMany();
+      // The delivery row is written after the receiver answers, so poll rather than sleep.
+      let logged = await prisma.webhookDelivery.findMany();
+      for (let i = 0; i < 60 && !logged.some((d) => d.ok && d.statusCode === 204); i++) {
+        await new Promise((r) => setTimeout(r, 50));
+        logged = await prisma.webhookDelivery.findMany();
+      }
       expect(logged.some((d) => d.ok && d.statusCode === 204)).toBe(true);
     });
 
