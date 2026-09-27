@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ApiError, patch, post, put } from "@/lib/api";
+import { ApiError, get, patch, post, put } from "@/lib/api";
+import { slugify, type SlugCheck } from "@/lib/slug";
 import { ShareLink } from "@/components/event/share-link";
 import { hue } from "@/lib/hues";
 import { Notice } from "@/components/ui/notice";
 import { Field } from "@/components/ui/field";
+import { MarkdownEditor } from "@/components/ui/markdown-editor";
 
 const STEPS = [
   { label: "Basics", note: "Name it and say what it is for." },
@@ -58,6 +60,11 @@ export default function CreateEventPage() {
   const [created, setCreated] = useState<{ slug: string; name: string; published: boolean } | null>(null);
 
   const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  // Until the organizer types a link, it follows the name.
+  const [slugEdited, setSlugEdited] = useState(false);
+  const [slugCheck, setSlugCheck] = useState<SlugCheck | "checking" | null>(null);
+  const [origin, setOrigin] = useState("");
   const [tagline, setTagline] = useState("");
   const [description, setDescription] = useState("");
   const [themeInput, setThemeInput] = useState("");
@@ -104,6 +111,8 @@ export default function CreateEventPage() {
       if (raw) {
         const d = JSON.parse(raw);
         setName(d.name ?? "");
+        setSlug(d.slug ?? "");
+        setSlugEdited(Boolean(d.slugEdited));
         setTagline(d.tagline ?? "");
         setDescription(d.description ?? "");
         setThemeTags(d.themeTags ?? []);
@@ -135,7 +144,7 @@ export default function CreateEventPage() {
       localStorage.setItem(
         DRAFT_KEY,
         JSON.stringify({
-          name, tagline, description, themeTags, mode, place,
+          name, slug, slugEdited, tagline, description, themeTags, mode, place,
           registrationClosesAt, submissionsOpenAt, submissionDeadline, judgingClosesAt,
           teamMin, teamMax, tracks, prizes, criteria, judges, eligibility, visibility,
           reviewsPerSubmission,
@@ -145,15 +154,47 @@ export default function CreateEventPage() {
       // Same as above.
     }
   }, [
-    restored, name, tagline, description, themeTags, mode, place,
+    restored, name, slug, slugEdited, tagline, description, themeTags, mode, place,
     registrationClosesAt, submissionsOpenAt, submissionDeadline, judgingClosesAt,
     teamMin, teamMax, tracks, prizes, criteria, judges, eligibility, visibility,
     reviewsPerSubmission,
   ]);
 
+  useEffect(() => setOrigin(window.location.origin), []);
+
+  useEffect(() => {
+    if (!slugEdited) setSlug(slugify(name));
+  }, [name, slugEdited]);
+
+  // Ask the server whether the link is free, a moment after typing stops.
+  useEffect(() => {
+    if (!slug) {
+      setSlugCheck(null);
+      return;
+    }
+    setSlugCheck("checking");
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      get<SlugCheck>(`/events/slug-availability?slug=${encodeURIComponent(slug)}`)
+        .then((check) => {
+          if (!cancelled) setSlugCheck(check);
+        })
+        .catch(() => {
+          if (!cancelled) setSlugCheck(null);
+        });
+    }, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [slug]);
+
   const stepError = useMemo(() => {
     if (step === 0) {
       if (!name.trim()) return "An event name is required.";
+      if (!slug) return "The event needs a link.";
+      if (slugCheck === "checking") return "Checking the event link...";
+      if (slugCheck && !slugCheck.available) return `Choose another event link: ${slugCheck.reason}`;
       return "";
     }
     if (step === 1) {
@@ -167,7 +208,7 @@ export default function CreateEventPage() {
       return "";
     }
     return "";
-  }, [step, name, submissionDeadline, teamMin, teamMax, criteria, weightSum]);
+  }, [step, name, slug, slugCheck, submissionDeadline, teamMin, teamMax, criteria, weightSum]);
 
   function iso(value: string): string | undefined {
     if (!value) return undefined;
@@ -181,6 +222,7 @@ export default function CreateEventPage() {
     try {
       const event = await post<{ id: string; slug: string; name: string }>("/events", {
         name: name.trim(),
+        slug,
         tagline: tagline.trim() || undefined,
         description: description.trim() || undefined,
         themeTags,
@@ -339,17 +381,80 @@ export default function CreateEventPage() {
               <Field label="Event name" hint="Shown in the listing and on the event page." bordered>
                 <input className={FIELD} value={name} onChange={(e) => setName(e.target.value)} placeholder="Gridshift '27" />
               </Field>
+              <div className="grid gap-[7px] border-b border-line py-4">
+                <label htmlFor="event-slug" className="text-ui font-medium">
+                  Event link
+                </label>
+                <div className="flex min-w-0 items-stretch overflow-hidden rounded-[10px] border border-line-strong bg-surface focus-within:border-[var(--btn-bd)]">
+                  <span className="flex max-w-[55%] flex-none items-center truncate border-r border-line bg-elevated px-3 font-mono text-small text-muted">
+                    {origin.replace(/^https?:\/\//, "")}/events/
+                  </span>
+                  <input
+                    id="event-slug"
+                    className="min-w-0 flex-1 bg-transparent px-3 py-2.5 font-mono text-small outline-none"
+                    value={slug}
+                    onChange={(e) => {
+                      setSlugEdited(true);
+                      setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 60));
+                    }}
+                    placeholder="gridshift-27"
+                    spellCheck={false}
+                    autoCapitalize="none"
+                    aria-describedby="event-slug-note"
+                    aria-invalid={slugCheck && slugCheck !== "checking" && !slugCheck.available ? true : undefined}
+                  />
+                </div>
+                <p id="event-slug-note" role="status" className="m-0 text-small leading-[1.5] text-muted">
+                  {slug && slugCheck === "checking" ? (
+                    "Checking..."
+                  ) : slug && slugCheck && slugCheck !== "checking" && slugCheck.available ? (
+                    <span style={{ color: "var(--ac)" }}>Available. This is the address you share.</span>
+                  ) : slug && slugCheck && slugCheck !== "checking" ? (
+                    <span style={{ color: "var(--err)" }}>
+                      {slugCheck.reason}
+                      {slugCheck.suggestion ? (
+                        <>
+                          {" "}
+                          <button
+                            type="button"
+                            className="border-0 bg-transparent p-0 text-small underline"
+                            onClick={() => {
+                              setSlugEdited(true);
+                              setSlug(slugCheck.suggestion!);
+                            }}
+                          >
+                            Use {slugCheck.suggestion}
+                          </button>
+                        </>
+                      ) : null}
+                    </span>
+                  ) : (
+                    "Lowercase letters, numbers and hyphens. This is the address you share."
+                  )}
+                </p>
+                {slugEdited ? (
+                  <button
+                    type="button"
+                    className="justify-self-start border-0 bg-transparent p-0 text-small text-muted underline"
+                    onClick={() => setSlugEdited(false)}
+                  >
+                    Follow the event name again
+                  </button>
+                ) : null}
+              </div>
               <Field label="Tagline" hint="Under 90 characters reads best in the listing." bordered>
                 <input className={FIELD} value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="One line on what participants will build" />
               </Field>
-              <Field label="Description" hint="Shown on the About tab of the event page." bordered>
-                <textarea
-                  className={`${FIELD} min-h-[140px] resize-y leading-[1.65]`}
+              <div className="border-b border-line py-4">
+                <MarkdownEditor
+                  id="event-description"
+                  label="Description"
+                  className={FIELD}
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="What the event is, who it is for, what a good submission looks like."
+                  onChange={setDescription}
+                  placeholder={"## What this is\nWho it is for, and what a good submission looks like.\n\n- Build window: one weekend\n- Teams of one to four"}
                 />
-              </Field>
+              </div>
               <div className="grid gap-[7px] border-b border-line py-4">
                 <label className="text-ui font-medium">Mode</label>
                 <div className="flex flex-wrap gap-[7px]">
@@ -674,6 +779,7 @@ export default function CreateEventPage() {
             <div className="card mt-[18px] overflow-hidden p-0">
               {[
                 { label: "Name", value: name || "Untitled" },
+                { label: "Link", value: `/events/${slug}` },
                 { label: "Tagline", value: tagline || "None" },
                 { label: "Themes", value: themeTags.join(", ") || "None" },
                 { label: "Registration closes", value: registrationClosesAt || "Not set" },
