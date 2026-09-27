@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" width="44" height="44" role="img" aria-label="podium">
+  <title>podium</title>
+  <rect width="44" height="44" rx="12" fill="#0b0b0e"/>
+  <rect x="5.5" y="19" width="9" height="16" rx="3" fill="#8b8b96"/>
+  <rect x="17.5" y="9" width="9" height="26" rx="3" fill="#fff"/>
+  <rect x="29.5" y="24" width="9" height="11" rx="3" fill="#8b8b96"/>
+</svg>

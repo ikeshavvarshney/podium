@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" width="44" height="44">
+  <title>podium</title>
+  <style>
+    .b{fill:#0b0b0e}.on{fill:#fff}.soft{fill:#8b8b96}
+    @media (prefers-color-scheme: dark){.b{fill:#f4f4f6}.on{fill:#0b0b0e}.soft{fill:#7b7b88}}
+  </style>
+  <rect width="44" height="44" rx="12" class="b"/>
+  <rect x="5.5" y="19" width="9" height="16" rx="3" class="soft"/>
+  <rect x="17.5" y="9" width="9" height="26" rx="3" class="on"/>
+  <rect x="29.5" y="24" width="9" height="11" rx="3" class="soft"/>
+</svg>

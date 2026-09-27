@@ -1,0 +1,574 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Semantic colour tokens. Light and dark are each composed, not inverted; every text pair meets WCAG AA. */
+:root {
+  /* Light: white canvas, near-black ink, blue brand mark, multi-colour accents (see the accent block below) */
+  --bg: #ffffff;
+  --sf: #ffffff;
+  --el: #f6f6f8;
+  --ln: #e6e6ea;
+  --ln-strong: #8b8b96;
+  --tx: #0b0b0e;
+  --mu: #4c4c58;
+
+  /* Primary action and brand. --ac is the brand mark colour for state and place (active nav, focus, links). */
+  --action: #0b0b0e;
+  --action-fg: #ffffff;
+  --ac: #3b5bdb;
+  --focus: #3b5bdb;
+
+  /* Selected: a brand wash for chosen options, current items and highlights. */
+  --acs: #eef2ff;
+  --act: #2b3fa8;
+  --acl: #c7d2fb;
+
+  /* Meaning. Each has a solid for graphics, a wash and a text colour that meet AA on their wash. */
+  --ok: #258651;
+  --ok-bg: #dff8e6;
+  --ok-fg: #07502c;
+  --warn: #bf7b11;
+  --warn-bg: #fff0d3;
+  --warn-fg: #683c00;
+  --err: #942124;
+  --errbg: #ffe8e8;
+  --info: #127d9d;
+  --info-bg: #dff4fd;
+  --info-fg: #004f6a;
+
+  /* Overlays, header glass, scrollbar, skeleton. */
+  --hl: rgba(255, 255, 255, 0.85);
+  --hd: rgba(255, 255, 255, 0.84);
+  --sbt: #d9d9df;
+  --sbh: #b3b3bd;
+  --shim: linear-gradient(90deg, var(--el) 0%, var(--bg) 40%, var(--el) 80%);
+
+  /* Illustration ramp: six steps of the brand hue, never used to encode meaning. */
+  --h1: #142359;
+  --h2: #253a86;
+  --h3: #3a55b1;
+  --h4: #5774cd;
+  --h5: #7b95dd;
+  --h6: #a1b6ec;
+
+  /* Tone pairs (background, foreground) for chips and tags. hue() in lib/hues.ts resolves to these. */
+  --tone-neutral-bg: var(--el);
+  --tone-neutral-fg: var(--mu);
+  --tone-brand-bg: var(--acs);
+  --tone-brand-fg: var(--act);
+  --tone-info-bg: var(--info-bg);
+  --tone-info-fg: var(--info-fg);
+  --tone-success-bg: var(--ok-bg);
+  --tone-success-fg: var(--ok-fg);
+  --tone-warning-bg: var(--warn-bg);
+  --tone-warning-fg: var(--warn-fg);
+  --tone-danger-bg: var(--errbg);
+  --tone-danger-fg: var(--err);
+}
+
+[data-theme="dark"] {
+  /* Dark: ink-blue tinted neutrals, lifted brand */
+  --bg: #0b0d13;
+  --sf: #14171e;
+  --el: #1d2028;
+  --ln: #2c303a;
+  --ln-strong: #6a7184;
+  --tx: #eceef4;
+  --mu: #a5abb8;
+
+  /* Primary action and brand. --ac is the brand mark colour for state and place (active nav, focus, links). */
+  --action: #84a1f0;
+  --action-fg: #080d1a;
+  --ac: var(--action);
+  --focus: #99b5ff;
+
+  /* Selected: a brand wash for chosen options, current items and highlights. */
+  --acs: #1e2949;
+  --act: #c9d7fa;
+  --acl: #3d528d;
+
+  /* Meaning. Each has a solid for graphics, a wash and a text colour that meet AA on their wash. */
+  --ok: #43c07a;
+  --ok-bg: #0f2e1b;
+  --ok-fg: #91e3ae;
+  --warn: #edb345;
+  --warn-bg: #362607;
+  --warn-fg: #f5cf7d;
+  --err: #f98f87;
+  --errbg: #3f191a;
+  --info: #63bfe1;
+  --info-bg: #0d2a35;
+  --info-fg: #97ddf9;
+
+  /* Overlays, header glass, scrollbar, skeleton. */
+  --hl: rgba(255, 255, 255, 0.06);
+  --hd: rgba(11, 13, 19, 0.78);
+  --sbt: #2c303a;
+  --sbh: #464d5e;
+  --shim: linear-gradient(90deg, var(--el) 0%, var(--bg) 40%, var(--el) 80%);
+
+  /* Illustration ramp: six steps of the brand hue, never used to encode meaning. */
+  --h1: #bed0fe;
+  --h2: #9fb9fc;
+  --h3: #84a1f0;
+  --h4: #6d8bde;
+  --h5: #5774cd;
+  --h6: #445fb5;
+}
+
+
+/* Button shades: a diagonal gradient (top left to bottom right) from a soft grey tint to pure white or black in the middle and back to the tint. The border and text stay tinted. */
+:root {
+  --btn-bg: linear-gradient(135deg, #e2e2e2 0%, #ffffff 50%, #e2e2e2 100%);
+  --btn-bd: #22242d;
+  --btn-tx: #171921;
+  --btn-fill: linear-gradient(135deg, #2c2c2c 0%, #000000 50%, #2c2c2c 100%);
+  --btn-fg: #f7f8fa;
+}
+
+[data-theme="dark"] {
+  --btn-bg: linear-gradient(135deg, #3c3c3c 0%, #000000 50%, #3c3c3c 100%);
+  --btn-bd: #b9bfcf;
+  --btn-tx: #eceef5;
+  --btn-fill: linear-gradient(135deg, #d0d0d0 0%, #ffffff 50%, #d0d0d0 100%);
+  --btn-fg: #10131a;
+}
+
+/* The logo is one static SVG (public/logo.svg, two shades on white). Dark theme flips it, which maps the ink badge to a light one and the white step to a dark one. */
+[data-theme="dark"] .logo-img {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Accent family. k = solid for graphics, k-s = very light wash, k-t = text on the wash (AA). Semantic use is documented in DESIGN.md. */
+:root {
+  --k-blue: #3b6ef5;
+  --k-blue-s: #eef3ff;
+  --k-blue-t: #2445b8;
+  --k-violet: #7b5cf0;
+  --k-violet-s: #f3f0ff;
+  --k-violet-t: #5236c2;
+  --k-cyan: #0ea5c9;
+  --k-cyan-s: #e9f9fd;
+  --k-cyan-t: #0b6078;
+  --k-green: #17a26b;
+  --k-green-s: #e9f9f1;
+  --k-green-t: #0a6a44;
+  --k-orange: #f08a24;
+  --k-orange-s: #fff3e6;
+  --k-orange-t: #92490a;
+  --k-pink: #e5478f;
+  --k-pink-s: #fff0f6;
+  --k-pink-t: #a3195a;
+  --k-yellow: #eab308;
+  --k-yellow-s: #fffbe6;
+  --k-yellow-t: #7a5a00;
+  --home-shadow: 0 1px 2px rgba(10, 10, 20, 0.04), 0 10px 28px -14px rgba(10, 10, 20, 0.12);
+  --home-shadow-up: 0 1px 2px rgba(10, 10, 20, 0.05), 0 18px 40px -18px rgba(10, 10, 20, 0.18);
+}
+
+[data-theme="dark"] {
+  --k-blue: #7c9dff;
+  --k-blue-s: rgba(124, 157, 255, 0.13);
+  --k-blue-t: #b5c8ff;
+  --k-violet: #a48bff;
+  --k-violet-s: rgba(164, 139, 255, 0.13);
+  --k-violet-t: #cfc2ff;
+  --k-cyan: #4cc9e8;
+  --k-cyan-s: rgba(76, 201, 232, 0.12);
+  --k-cyan-t: #9fe3f4;
+  --k-green: #45c890;
+  --k-green-s: rgba(69, 200, 144, 0.12);
+  --k-green-t: #93e6c0;
+  --k-orange: #f5a24d;
+  --k-orange-s: rgba(245, 162, 77, 0.13);
+  --k-orange-t: #fbc88f;
+  --k-pink: #f27bb0;
+  --k-pink-s: rgba(242, 123, 176, 0.13);
+  --k-pink-t: #f9b3d1;
+  --k-yellow: #f0c93a;
+  --k-yellow-s: rgba(240, 201, 58, 0.12);
+  --k-yellow-t: #f7de85;
+  --home-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 28px -14px rgba(0, 0, 0, 0.5);
+  --home-shadow-up: 0 1px 2px rgba(0, 0, 0, 0.3), 0 18px 40px -18px rgba(0, 0, 0, 0.6);
+}
+
+/* Type roles resolve to the three self-hosted families loaded in layout.tsx. */
+:root {
+  --font-display: var(--font-jost), var(--font-dm-sans), "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--tx);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* A barely-there tint at the top of every screen, echoing the homepage hero. */
+body::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 460px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(520px 300px at 6% 0%, var(--k-blue-s), transparent 70%),
+    radial-gradient(520px 300px at 96% 0%, var(--k-violet-s), transparent 70%);
+}
+
+body:has(.home)::before {
+  display: none;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Long names must wrap inside their box, never push it wider. Titles balance their lines. */
+h1,
+h2,
+h3 {
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+p,
+li,
+dd,
+label {
+  overflow-wrap: break-word;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fadein {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.88);
+  }
+}
+
+@keyframes shim {
+  from {
+    background-position: -460px 0;
+  }
+  to {
+    background-position: 460px 0;
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+::selection {
+  background: var(--acl);
+}
+
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+a:focus-visible,
+[tabindex="0"]:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--sbt);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+  transition: background-color 420ms cubic-bezier(0.33, 1, 0.68, 1) 60ms;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--sbh);
+  background-clip: content-box;
+}
+
+html,
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sbt) transparent;
+}
+
+/*
+ * Touch and narrow screens: every control in the page body and in dialogs reaches the 44px minimum.
+ * Switches and inline remove buttons keep their drawn size and get a larger hit area instead.
+ */
+@media (pointer: coarse), (max-width: 767px) {
+  :is(main, dialog) :is(input:not([type="checkbox"], [type="radio"], [type="hidden"], [type="range"]), select, textarea) {
+    min-height: 44px;
+  }
+
+  :is(main, dialog) button:not([role="switch"], [aria-label^="Remove"]) {
+    min-height: 44px;
+  }
+
+  :is(main, dialog) nav a,
+  :is(main, dialog) a.eyebrow,
+  :is(main, dialog) a.uppercase {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+  }
+
+  [role="switch"],
+  button[aria-label^="Remove"]:not(.absolute, .fixed) {
+    position: relative;
+  }
+
+  [role="switch"]::after {
+    content: "";
+    position: absolute;
+    inset: -11px -4px;
+  }
+
+  button[aria-label^="Remove"]::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
+  }
+}
+
+@media (pointer: coarse) {
+  .btn,
+  .btn-sm,
+  .field {
+    min-height: 44px;
+  }
+
+  .pill {
+    position: relative;
+  }
+
+  .pill::after {
+    content: "";
+    position: absolute;
+    inset: -8px -2px;
+  }
+}
+
+@layer components {
+  /* Scores and statistics stay column-aligned as digits change. */
+  .text-figure {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The screen wrapper: matches the prototype's <main> rhythm. */
+  .screen {
+    @apply mx-auto px-[clamp(18px,4vw,28px)] pb-[120px] pt-[clamp(30px,5vw,46px)];
+    animation: rise 560ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  /* One accent phrase in a heading, set in the serif italic. Playfair has a smaller x-height than the display face, so it is nudged up to sit at the same optical size. */
+  .type-accent {
+    @apply font-accent italic font-medium tracking-[-0.015em];
+    font-size: 1.05em;
+    /* An inline span with its own taller metrics would stretch the line it sits on; this keeps line spacing even. */
+    line-height: 0;
+  }
+
+  .eyebrow {
+    @apply font-mono text-[0.75rem] font-medium uppercase tracking-label text-text;
+  }
+
+  .display {
+    @apply font-display font-[560] leading-[1.05] tracking-[-0.035em];
+  }
+
+  .card {
+    @apply rounded-[14px] border border-line bg-surface;
+    box-shadow: var(--home-shadow);
+  }
+
+  .lift {
+    transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 320ms cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 240ms;
+  }
+
+  .lift:hover {
+    transform: translateY(-2px);
+    border-color: var(--ln-strong);
+    box-shadow: var(--home-shadow-up);
+  }
+
+  /* The prototype's statistic card: a coloured top rule over a raised surface. */
+  .kpi {
+    @apply rounded-[10px] border border-line bg-surface px-[17px] pb-[15px] pt-3.5;
+    border-top-width: 3px;
+    box-shadow:
+      inset 0 1px 0 var(--hl),
+      0 1px 2px -1px rgba(24, 24, 27, 0.08),
+      0 4px 10px -6px rgba(24, 24, 27, 0.1);
+    transition:
+      background-color 300ms cubic-bezier(0.33, 1, 0.68, 1),
+      border-color 300ms cubic-bezier(0.33, 1, 0.68, 1),
+      transform 400ms cubic-bezier(0.33, 1, 0.68, 1),
+      box-shadow 400ms cubic-bezier(0.33, 1, 0.68, 1);
+  }
+
+  .kpi:hover {
+    transform: translate3d(0, -2px, 0);
+    box-shadow:
+      inset 0 1px 0 var(--hl),
+      0 1px 2px -1px rgba(24, 24, 27, 0.07),
+      0 10px 20px -12px rgba(24, 24, 27, 0.14);
+  }
+
+  /* Shimmering placeholder, used while a screen's data is still loading. */
+  .skeleton {
+    background-color: var(--ln);
+    background-image: var(--shim);
+    background-size: 460px 100%;
+    animation: shim 1.4s linear infinite;
+  }
+
+  /* White with a dark border; the fill sweeps in from the left on hover and keyboard focus. */
+  .btn {
+    @apply max-md:min-h-[44px] relative isolate inline-flex cursor-pointer items-center justify-center gap-2 overflow-hidden
+      rounded-[10px] border px-[17px] py-[11px] text-ui font-medium;
+    border-color: var(--btn-bd);
+    background: var(--btn-bg);
+    color: var(--btn-tx);
+    transition: color 320ms cubic-bezier(0.22, 1, 0.36, 1), transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 200ms;
+  }
+
+  .btn::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--sweep, var(--btn-fill));
+    transform: translateX(-101%);
+    transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .btn:not(:disabled):hover,
+  .btn:not(:disabled):focus-visible {
+    color: var(--sweep-fg, var(--btn-fg)) !important;
+  }
+
+  .btn:not(:disabled):hover::before,
+  .btn:not(:disabled):focus-visible::before {
+    transform: none;
+  }
+
+  .btn:active:not(:disabled) {
+    transform: scale(0.985);
+  }
+
+  /* Same white button as .btn: white at rest, near-black fill sweeps in on hover. A soft shadow marks the main action. */
+  .btn-primary {
+    @apply btn;
+    box-shadow: var(--home-shadow);
+  }
+
+  .btn-sm {
+    @apply px-[14px] py-[9px] text-ui max-md:min-h-[44px];
+  }
+
+  .field {
+    @apply max-md:min-h-[44px] w-full rounded-[10px] border border-line-strong bg-surface px-[13px] py-[10px]
+      text-ui text-text outline-none transition-[border-color,box-shadow] duration-200
+      placeholder:text-muted focus:border-accent;
+  }
+
+  .field:focus {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ac) 18%, transparent);
+  }
+
+  /* Dotted field used behind empty states and visual panels. */
+  .bg-dots {
+    background-image: radial-gradient(var(--ln) 1px, transparent 1.2px);
+    background-size: 20px 20px;
+  }
+
+  .chip {
+    @apply inline-flex items-center rounded-full px-[10px] py-[5px] font-mono text-label;
+  }
+
+  .pill {
+    @apply inline-flex cursor-pointer items-center rounded-full border px-[10px] py-[5px]
+      font-mono text-meta transition-colors duration-200;
+  }
+
+  .status-chip {
+    @apply rounded-[5px] px-2 py-[3px] font-mono text-label uppercase tracking-stamp;
+  }
+
+  .meta-row {
+    @apply mt-[14px] flex flex-wrap gap-x-[18px] gap-y-[6px] font-mono text-meta text-text;
+  }
+}
