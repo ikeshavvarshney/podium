@@ -44,6 +44,8 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+      # The API port is published directly, so X-Forwarded-For is not trusted by default.
+      TRUST_PROXY: ${TRUST_PROXY:-false}
       SEED_ON_BOOT: ${SEED_ON_BOOT:-true}
       FIXTURES_PATH: /app/fixtures.json
     # The organisers' shared data set, imported as its own event on first boot.

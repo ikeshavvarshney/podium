@@ -25,6 +25,21 @@ const EnvSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((v) => v === "true"),
+  /**
+   * Express `trust proxy`. Off by default: the API is published directly, so an
+   * `X-Forwarded-For` header comes from the client and must not choose the IP that
+   * rate limits and vote caps key on. Behind a reverse proxy, set a hop count ("1")
+   * or the proxy's address or subnet.
+   */
+  TRUST_PROXY: z
+    .string()
+    .default("false")
+    .transform((v): boolean | number | string => {
+      const value = v.trim();
+      if (value === "" || value === "false") return false;
+      if (value === "true") return true;
+      return /^\d+$/.test(value) ? Number(value) : value;
+    }),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema> & {

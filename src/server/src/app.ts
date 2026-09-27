@@ -17,7 +17,7 @@ import statsRoutes from "./routes/stats.routes.js";
 export function createApp(): Express {
   const app = express();
 
-  app.set("trust proxy", 1);
+  app.set("trust proxy", config.TRUST_PROXY);
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   app.use(
     cors({
