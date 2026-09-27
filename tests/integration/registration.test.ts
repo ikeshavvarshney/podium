@@ -74,4 +74,27 @@ describe("registration details", () => {
     });
     expect(required).toBe(0);
   });
+
+  it("counts participants and submitted projects only in the public numbers", async () => {
+    const judge = await createUser({ name: "Judge" });
+    await as(organizer).post(`/api/events/${event.id}/members`).send({ email: judge.email, role: "JUDGE" }).expect(201);
+
+    const dana = await createUser({ name: "Dana" });
+    await as(dana)
+      .post(`/api/events/${event.id}/register`)
+      .send({ acceptRules: true, acceptConduct: true, answers: [{ questionId, value: "Triage" }] })
+      .expect(201);
+    await as(dana).post(`/api/events/${event.id}/teams`).send({ name: "Draftless" }).expect(201);
+    await as(dana).post(`/api/events/${event.id}/submissions`).send({ name: "Still a draft" }).expect(201);
+
+    const participants = await prisma.eventMembership.count({ where: { eventId: event.id, role: "PARTICIPANT" } });
+    const detail = await as(dana).get(`/api/events/${event.id}`).expect(200);
+    expect(detail.body._count.memberships).toBe(participants);
+    expect(detail.body._count.submissions).toBe(0);
+
+    const listing = await as(dana).get("/api/events?take=50").expect(200);
+    const card = listing.body.items.find((e: { id: string }) => e.id === event.id);
+    expect(card._count.memberships).toBe(participants);
+    expect(card._count.submissions).toBe(0);
+  });
 });

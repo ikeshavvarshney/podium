@@ -6,6 +6,7 @@ import {
   Experience,
   Prisma,
   QuestionStage,
+  SubmissionStatus,
 } from "@prisma/client";
 import { prisma } from "../db.js";
 import { badRequest, conflict, forbidden, notFound } from "../lib/errors.js";
@@ -233,7 +234,7 @@ export async function listPublicEvents(query: ListEventsQuery) {
       include: {
         prizes: { select: { amountCents: true, currency: true } },
         owner: { select: { name: true, org: true } },
-        _count: { select: { submissions: true, memberships: true, teams: true } },
+        _count: { select: publicCounts },
       },
     }),
     prisma.event.count({ where }),
@@ -253,6 +254,16 @@ export async function listPublicEvents(query: ListEventsQuery) {
   };
 }
 
+/**
+ * The numbers an event shows the public. "Registered" is participants, not every role
+ * holder, and "submissions" is what is in the gallery: a draft is nobody's business yet.
+ */
+const publicCounts = {
+  submissions: { where: { status: SubmissionStatus.SUBMITTED } },
+  memberships: { where: { role: EventRole.PARTICIPANT } },
+  teams: true,
+} as const;
+
 export async function getEventDetail(ctx: EventContext) {
   const event = await prisma.event.findUnique({
     where: { id: ctx.event.id },
@@ -261,7 +272,7 @@ export async function getEventDetail(ctx: EventContext) {
       prizes: { orderBy: { position: "asc" }, include: { track: { select: { id: true, name: true } } } },
       customQuestions: { orderBy: { position: "asc" } },
       owner: { select: { id: true, name: true, org: true } },
-      _count: { select: { submissions: true, teams: true, memberships: true } },
+      _count: { select: publicCounts },
     },
   });
   if (!event) throw notFound("Event not found.");
