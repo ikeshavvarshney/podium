@@ -5,10 +5,9 @@
 base_url = "http://localhost:4000"
 
 [tiers]
-# The checker verifies T1 and T2 only; T3 is claimed on the features and tests described in
-# README.md. T4 is mostly built (REST API with OpenAPI, webhooks, certificates, signed judge
-# records, embeddable gallery, bulk import/export) but not claimed: webhooks cover 7 event types.
-claimed = ["T1", "T2", "T3"]
+# The checker verifies T1 and T2 only; T3 and T4 are claimed on the features and tests
+# described in README.md and walked through in docs/MANUAL-TESTING.md.
+claimed = ["T1", "T2", "T3", "T4"]
 pitch = "A self-hostable, API-first hackathon platform with event-scoped roles, weighted rubrics, documented cross-judge normalization and judge isolation enforced in the backend."
 
 [auth]
