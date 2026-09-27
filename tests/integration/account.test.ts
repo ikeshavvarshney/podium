@@ -13,6 +13,18 @@ describe("account self-service", () => {
     await prisma.$disconnect();
   });
 
+  it("answers the session check with no user, rather than 401, when signed out", async () => {
+    const res = await anon().get("/api/auth/session").expect(200);
+    expect(res.body).toEqual({ user: null, events: [] });
+    await anon().get("/api/auth/me").expect(401);
+  });
+
+  it("answers the session check with the caller's profile when signed in", async () => {
+    const res = await as(alice).get("/api/auth/session").expect(200);
+    expect(res.body.user.id).toBe(alice.id);
+    expect(Array.isArray(res.body.events)).toBe(true);
+  });
+
   it("refuses profile changes from an anonymous caller", async () => {
     await anon().patch("/api/auth/me").send({ name: "Nobody" }).expect(401);
   });

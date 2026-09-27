@@ -212,6 +212,6 @@ export interface MyEventRow {
 }
 
 export interface SessionResponse {
-  user: User;
+  user: User | null;
   events: MyEventRow[];
 }

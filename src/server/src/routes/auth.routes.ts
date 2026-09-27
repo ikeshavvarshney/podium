@@ -129,6 +129,21 @@ router.post(
   }),
 );
 
+/**
+ * The web client's "who is here" check. Unlike `/me`, a caller with no session is a normal
+ * answer here rather than an error, so every signed-out page view is not a logged 401.
+ */
+router.get(
+  "/session",
+  asyncHandler(async (req, res) => {
+    if (!req.user) {
+      res.json({ user: null, events: [] });
+      return;
+    }
+    res.json({ user: await getProfile(req.user.id), events: await getMyEventRoles(req.user.id) });
+  }),
+);
+
 router.get(
   "/me",
   requireAuth,

@@ -21,11 +21,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const data = await get<SessionResponse>("/auth/me");
+      const data = await get<SessionResponse>("/auth/session");
       setUser(data.user);
       setEvents(data.events);
     } catch {
-      // A 401 simply means nobody is signed in.
       setUser(null);
       setEvents([]);
     } finally {
