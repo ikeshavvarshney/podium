@@ -312,6 +312,7 @@ export default function VotingManagerPage() {
                     type="button"
                     role="switch"
                     aria-checked={on}
+                    aria-label={t.label}
                     onClick={() => void save({ [t.key]: !on } as Partial<VotingConfig>)}
                     className="relative h-6 w-[42px] flex-none rounded-full border p-0 [transition:background-color_420ms_cubic-bezier(0.33,1,0.68,1)_60ms,border-color_260ms]"
                     style={{
