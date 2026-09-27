@@ -25,6 +25,8 @@ interface BallotView {
   creditBudget: number;
   creditsSpent: number;
   hideResults: boolean;
+  /** Why this viewer's roles rule them out of voting, if they do. */
+  ineligibleReason: string | null;
   submissions: BallotSubmission[];
   myVotes: Array<{ submissionId: string; weight: number; credits: number }>;
 }
@@ -75,8 +77,9 @@ export default function VotePage() {
 
   const budget = ballot.creditBudget;
   const over = ballot.method === "QUADRATIC" && spent > budget;
-  const needsEmail = !user && ballot.access === "EMAIL_GATED";
-  const needsAccount = !user && ballot.access === "AUTHENTICATED";
+  const ineligible = ballot.ineligibleReason;
+  const needsAccount = !user && (ballot.access === "AUTHENTICATED" || Boolean(ineligible));
+  const needsEmail = !user && !needsAccount && ballot.access === "EMAIL_GATED";
 
   function setWeight(id: string, next: number) {
     setWeights((prev) => ({ ...prev, [id]: Math.max(0, next) }));
@@ -142,9 +145,15 @@ export default function VotePage() {
         </div>
       ) : null}
 
+      {ineligible && user ? (
+        <div className="mt-6 rounded-[10px] bg-danger-soft px-[13px] py-2.5 text-small text-danger">{ineligible}</div>
+      ) : null}
+
       {needsAccount ? (
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <span className="text-ui text-muted">This event only accepts ballots from signed-in accounts.</span>
+          <span className="text-ui text-muted">
+            {ineligible ?? "This event only accepts ballots from signed-in accounts."}
+          </span>
           <Link href={`/auth?next=/events/${slug}/vote`} className="btn-primary">
             Sign in to vote
           </Link>
@@ -244,7 +253,7 @@ export default function VotePage() {
         <button
           type="button"
           onClick={() => void submit()}
-          disabled={busy || over || !ballot.window.open || needsAccount || (needsEmail && !email)}
+          disabled={busy || over || !ballot.window.open || needsAccount || Boolean(ineligible) || (needsEmail && !email)}
           className="btn-primary disabled:opacity-40"
         >
           {busy ? "Submitting..." : "Submit ballot"}

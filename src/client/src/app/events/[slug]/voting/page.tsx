@@ -18,6 +18,8 @@ interface VotingConfig {
   creditBudget: number;
   hideResults: boolean;
   shuffleBallot: boolean;
+  allowVisitors: boolean;
+  allowParticipants: boolean;
   allowJudges: boolean;
   allowAdmins: boolean;
   maxVotesPerIpPerHour: number;
@@ -51,6 +53,8 @@ interface VoteResults {
     submission: { id: string; name: string; track: { name: string } | null } | null;
   }>;
 }
+
+type VoterGroup = "allowVisitors" | "allowParticipants" | "allowJudges" | "allowAdmins";
 
 const ACCESS_LABEL: Record<VotingConfig["access"], string> = {
   OPEN_LINK: "Open link",
@@ -134,17 +138,15 @@ export default function VotingManagerPage() {
       label: "Randomize ballot order per voter",
       hint: "Deterministic per voter, different between voters, so position bias cannot accumulate.",
     },
-    {
-      key: "allowJudges",
-      label: "Judges may also vote",
-      hint: "Off by default: a judge already scores these projects on the rubric.",
-    },
-    {
-      key: "allowAdmins",
-      label: "Organizers may also vote",
-      hint: "Off by default, for the same reason.",
-    },
   ];
+
+  const voterGroups: Array<{ key: VoterGroup; label: string; hint: string }> = [
+    { key: "allowVisitors", label: "Visitors", hint: "Anyone with no role in this event, signed in or not." },
+    { key: "allowParticipants", label: "Participants", hint: "Registered entrants. They can never back their own team." },
+    { key: "allowJudges", label: "Judges", hint: "Off by default: they already score on the rubric." },
+    { key: "allowAdmins", label: "Admins and organizers", hint: "Off by default, for the same reason." },
+  ];
+  const allowedGroups = voterGroups.filter((g) => config[g.key]).length;
 
   return (
     <main className="screen max-w-[900px] pb-[120px] pt-[clamp(26px,4vw,40px)]">
@@ -274,7 +276,44 @@ export default function VotingManagerPage() {
           ) : null}
 
           <div className="mt-6 text-ui font-medium">Who can vote</div>
-          <div className="mt-2.5 flex flex-wrap gap-[7px]">
+          <p className="mt-1 max-w-[62ch] text-small leading-[1.55] text-muted">
+            Someone holding several roles may vote only if every role they hold is allowed. The server
+            enforces this on every ballot.
+          </p>
+          <div className="mt-2.5 grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr))]" role="group" aria-label="Who can vote">
+            {voterGroups.map((g) => {
+              const on = config[g.key];
+              const last = on && allowedGroups === 1;
+              return (
+                <button
+                  key={g.key}
+                  type="button"
+                  aria-pressed={on}
+                  disabled={last}
+                  title={last ? "At least one group must be able to vote." : undefined}
+                  onClick={() => void save({ [g.key]: !on } as Partial<VotingConfig>)}
+                  className="rounded-[10px] border px-3 py-2.5 text-left [transition:background-color_200ms,border-color_200ms] disabled:cursor-not-allowed"
+                  style={{
+                    background: on ? "var(--acs)" : "var(--sf)",
+                    borderColor: on ? "var(--ac)" : "var(--ln)",
+                  }}
+                >
+                  <span className="block text-ui font-medium" style={{ color: on ? "var(--act)" : "var(--tx)" }}>
+                    {on ? "✓ " : ""}
+                    {g.label}
+                  </span>
+                  <span className="mt-0.5 block text-small leading-[1.45] text-muted">{g.hint}</span>
+                </button>
+              );
+            })}
+          </div>
+          {!config.allowVisitors && config.access !== "AUTHENTICATED" ? (
+            <p className="mt-2 max-w-[62ch] text-small leading-[1.55] text-muted">
+              With visitors off, only people holding a role here can vote, so in practice every voter signs in.
+            </p>
+          ) : null}
+
+          <div className="mt-4 flex flex-wrap gap-[7px]" role="group" aria-label="How voters sign in">
             {(["AUTHENTICATED", "EMAIL_GATED", "OPEN_LINK"] as const).map((a) => {
               const on = config.access === a;
               const h = hue("brand");
