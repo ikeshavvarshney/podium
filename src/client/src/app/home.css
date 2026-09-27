@@ -1,0 +1,545 @@
+/*
+ * Homepage design system. Everything here is scoped to a page that renders <main class="home">:
+ * the white-and-black token override uses :has(), so the shared header and footer follow it
+ * on "/" and no other route changes. Dark theme keeps the app tokens and only gains the accents.
+ */
+
+.home {
+  overflow-x: clip;
+}
+
+/* Type: Jost for headings, DM Sans for text, Playfair Display italic for accent phrases. */
+.home-h1 {
+  font-family: var(--font-display, inherit);
+  font-weight: 560;
+  letter-spacing: -0.03em;
+  line-height: 1.06;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+}
+
+.home-h2 {
+  font-family: var(--font-display, inherit);
+  font-weight: 500;
+  letter-spacing: -0.028em;
+  line-height: 1.12;
+  font-size: clamp(1.55rem, 2.7vw, 2.25rem);
+}
+
+.home-lead {
+  color: var(--mu);
+  line-height: 1.6;
+  font-size: clamp(0.9375rem, 1.1vw, 1.0625rem);
+}
+
+.home-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--tx);
+}
+
+.home-eyebrow > i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--k, var(--ac));
+}
+
+/* The one hand-drawn touch in the hero: a colour bar under the last word. */
+.home-mark {
+  background-image: linear-gradient(90deg, var(--k-blue), var(--k-violet) 45%, var(--k-pink));
+  background-repeat: no-repeat;
+  background-size: 100% 0.13em;
+  background-position: 0 82%;
+  padding-bottom: 0.04em;
+}
+
+/* Buttons. Soft tinted grey with a charcoal border; hover fills charcoal. The arrow leans forward. */
+.hb {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--btn-bd);
+  background: var(--btn-bg);
+  --sweep: var(--btn-fill);
+  --sweep-fg: var(--btn-fg);
+  padding: 0 22px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--btn-tx);
+  transition: color 380ms cubic-bezier(0.22, 1, 0.36, 1), transform 380ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Fill sweeps in from the left. Any button can opt in with .sweep and set --sweep / --sweep-fg. */
+.hb::before,
+.sweep::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--sweep, var(--tx));
+  transform: translateX(-101%);
+  transition: transform 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sweep {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.hb:hover,
+.hb:focus-visible {
+  color: var(--btn-fg);
+}
+
+.sweep:hover,
+.sweep:focus-visible {
+  color: var(--sweep-fg, var(--bg));
+}
+
+.hb:hover::before,
+.hb:focus-visible::before,
+.sweep:hover::before,
+.sweep:focus-visible::before {
+  transform: none;
+}
+
+.hb:active {
+  transform: scale(0.985);
+}
+
+.hb .arr {
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.hb:hover .arr {
+  transform: translateX(3px);
+}
+
+/*
+ * The lead button of a pair: filled where its partner is outlined. The tokens flip with the theme, so it is near-black
+ * with light text on white and light with dark text on dark, and the hover sweep runs the other way.
+ */
+.hb-solid {
+  background: var(--btn-fill);
+  color: var(--btn-fg);
+  --sweep: var(--btn-bg);
+  --sweep-fg: var(--btn-tx);
+}
+
+.hb-solid:hover,
+.hb-solid:focus-visible {
+  color: var(--btn-tx);
+}
+
+/* A link that draws its underline from the left. */
+.home-link {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-size: 0 1px;
+  background-position: 0 100%;
+  transition: background-size 260ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.home-link:hover,
+.home-link:focus-visible {
+  background-size: 100% 1px;
+}
+
+/* Floating elements: soft, layered, never heavy. */
+.home-lift {
+  transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 500ms cubic-bezier(0.22, 1, 0.36, 1), border-color 300ms;
+}
+
+.home-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--home-shadow-up);
+}
+
+/* Dotted field behind visual panels. */
+.home-dots {
+  background-image: radial-gradient(var(--ln) 1px, transparent 1.2px);
+  background-size: 20px 20px;
+}
+
+/* Hero backdrop: two barely-there washes in the corners. */
+.home-hero {
+  position: relative;
+  isolation: isolate;
+}
+
+.home-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 620px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(520px 320px at 8% 0%, var(--k-blue-s), transparent 70%),
+    radial-gradient(520px 320px at 96% 6%, var(--k-violet-s), transparent 70%),
+    radial-gradient(420px 260px at 60% 0%, var(--k-cyan-s), transparent 72%);
+}
+
+/* Lifecycle rail: a gradient thread that the five phase nodes sit on. */
+.phase-list {
+  position: relative;
+}
+
+.phase-list::before {
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 16px;
+  bottom: 16px;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--k-blue), var(--k-violet), var(--k-cyan), var(--k-green), var(--k-orange));
+  opacity: 0.55;
+}
+
+@media (min-width: 768px) {
+  .phase-list::before {
+    left: 6px;
+    right: 6px;
+    top: 15px;
+    bottom: auto;
+    width: auto;
+    height: 2px;
+    background: linear-gradient(90deg, var(--k-blue), var(--k-violet), var(--k-cyan), var(--k-green), var(--k-orange));
+  }
+}
+
+.phase-node {
+  transition: background-color 240ms, color 240ms, transform 260ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.phase-item {
+  outline-offset: 10px;
+  transition: opacity 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.phase-item:hover .phase-node,
+.phase-item:focus-visible .phase-node {
+  background: var(--k);
+  transform: scale(1.35);
+}
+
+/* The rest of the row recedes while one phase is held. */
+.phase-list:has(.phase-item:hover, .phase-item:focus-visible) .phase-item:not(:hover):not(:focus-visible) {
+  opacity: 0.5;
+}
+
+.phase-gate {
+  transition: background-color 320ms cubic-bezier(0.22, 1, 0.36, 1), color 320ms;
+}
+
+.phase-item:hover .phase-gate,
+.phase-item:focus-visible .phase-gate {
+  background: var(--kt);
+  color: #fff;
+}
+
+/* The connector to the next phase lights up in that phase's colour. */
+@media (min-width: 768px) {
+  .phase-item:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    top: 14px;
+    left: 20px;
+    width: calc(100% + 32px - 26px);
+    height: 2px;
+    border-radius: 2px;
+    background: var(--k);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+  }
+
+  .phase-item:hover::after,
+  .phase-item:focus-visible::after {
+    transform: scaleX(1);
+  }
+}
+
+/* Flowing dashes on connectors (stroke-dashoffset on tiny paths). */
+@keyframes home-flow {
+  to {
+    stroke-dashoffset: -18;
+  }
+}
+
+.home-flow {
+  stroke-dasharray: 4 5;
+  animation: home-flow 2.4s cubic-bezier(0.45, 0, 0.35, 1) infinite;
+}
+
+/* Hero stage: one 9s loop. Base styles are the finished state,. */
+@keyframes st-travel {
+  0%,
+  46% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  62% {
+    transform: translateY(74px);
+    opacity: 1;
+  }
+  66%,
+  100% {
+    transform: translateY(74px);
+    opacity: 0;
+  }
+}
+
+.stage-travel {
+  opacity: 0;
+  animation: st-travel 9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/*
+ * Entrance motion is time-based and eased, triggered once by an IntersectionObserver (reveal.tsx).
+ * The hidden state only applies after that script has run, so content is visible without JavaScript.
+ */
+.reveal-on .reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 800ms cubic-bezier(0.22, 1, 0.36, 1), transform 1000ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.reveal-on .reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+.reveal-on .draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 1600ms cubic-bezier(0.22, 1, 0.36, 1) 150ms, stroke-opacity 240ms, stroke-width 240ms;
+}
+
+.reveal-on .in .draw {
+  stroke-dashoffset: 0;
+}
+
+.reveal-on .phase-list::before {
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 1500ms cubic-bezier(0.22, 1, 0.36, 1) 100ms;
+}
+
+.reveal-on .phase-list.in::before {
+  transform: scaleX(1);
+}
+
+@media (max-width: 767px) {
+  .reveal-on .phase-list::before {
+    transform: scaleY(0);
+    transform-origin: center top;
+  }
+
+  .reveal-on .phase-list.in::before {
+    transform: scaleY(1);
+  }
+}
+
+/* Hero mark: evaluations run along each assignment; bars and rings breathe. Base state is static. */
+.mark-dot {
+  offset-rotate: 0deg;
+  offset-distance: 100%;
+  opacity: 0;
+  animation: mark-run 4.8s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+  animation-delay: var(--d);
+}
+
+@keyframes mark-run {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  68% {
+    offset-distance: 100%;
+    opacity: 1;
+  }
+  78%,
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+.mark-bar {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: mark-bar 4.8s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+  animation-delay: var(--d);
+}
+
+@keyframes mark-bar {
+  0%,
+  100% {
+    transform: scaleX(0.3);
+  }
+  55%,
+  78% {
+    transform: scaleX(1);
+  }
+}
+
+.mark-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mark-ring 4.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation-delay: var(--d);
+}
+
+@keyframes mark-ring {
+  0%,
+  100% {
+    transform: scale(1);
+    stroke-opacity: 1;
+  }
+  20% {
+    transform: scale(1.18);
+    stroke-opacity: 0.45;
+  }
+  40% {
+    transform: scale(1);
+    stroke-opacity: 1;
+  }
+}
+
+/* Horizontal link in the playable ranking, and a soft ring that flashes when the inputs change. */
+@keyframes stage-travel-x {
+  0%,
+  40% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  48% {
+    opacity: 1;
+  }
+  72% {
+    transform: translateX(150px);
+    opacity: 1;
+  }
+  78%,
+  100% {
+    transform: translateX(150px);
+    opacity: 0;
+  }
+}
+
+.stage-travel-x {
+  opacity: 0;
+  animation: stage-travel-x 4.8s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+
+@keyframes rank-flash {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.025);
+  }
+}
+
+.rank-flash {
+  pointer-events: none;
+  position: absolute;
+  inset: -1px;
+  border-radius: 16px;
+  border: 2px solid var(--k-green);
+  animation: rank-flash 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Diagram parts pop in one after another when their section scrolls into view. */
+.reveal-on .pop {
+  opacity: 0;
+  transform: scale(0.4);
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0ms), opacity 500ms ease var(--d, 0ms),
+    r 260ms, fill 240ms, fill-opacity 240ms, stroke-opacity 240ms;
+}
+
+.reveal-on .in .pop {
+  opacity: 1;
+  transform: none;
+}
+
+.reveal-on .phase-item {
+  opacity: 0;
+}
+
+.reveal-on .in .phase-item {
+  opacity: 1;
+  animation: phase-in 900ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: var(--d, 0ms);
+}
+
+@keyframes phase-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+/* Looping motion waits until its diagram is on screen. */
+.reveal-on .reveal:not(.in) :is(.mark-dot, .mark-ring, .home-flow) {
+  animation-play-state: paused;
+}
+
+.reveal-on .stack-node {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 600ms cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0ms), transform 800ms cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0ms);
+}
+
+.reveal-on .in .stack-node {
+  opacity: 1;
+  transform: none;
+}
+
+/* Standings rows glide to their new rank; bars grow from the left. */
+.hero-row {
+  transition: transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.hero-bar {
+  transition: transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Interactive curves ease between the raw and corrected positions. */
+.curve-move {
+  transition: transform 1700ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* Phones: no continuously repainting dashes; the static lines carry the meaning. */
+@media (max-width: 767px) {
+  .home .home-flow {
+    animation: none;
+  }
+}
