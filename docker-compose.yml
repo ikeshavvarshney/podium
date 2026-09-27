@@ -1,0 +1,82 @@
+## podium - one command to a seeded, running portal.
+##
+##   docker compose up
+##
+## Three services, no external dependencies: Postgres, the API, the web client.
+## After the images and npm packages are cached locally this runs with the
+## network off.
+
+# Fixes the Compose project name, so images, containers, network and volume are all
+# called podium-* whatever the checkout folder is named.
+name: podium
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-podium}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-podium}
+      POSTGRES_DB: ${POSTGRES_DB:-podium}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-podium} -d ${POSTGRES_DB:-podium}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  server:
+    build:
+      context: ./src/server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-podium}:${POSTGRES_PASSWORD:-podium}@db:5432/${POSTGRES_DB:-podium}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-in-production-0123456789abcdef}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+      SEED_ON_BOOT: ${SEED_ON_BOOT:-true}
+      FIXTURES_PATH: /app/fixtures.json
+    # The organisers' shared data set, imported as its own event on first boot.
+    volumes:
+      - ./fixtures.json:/app/fixtures.json:ro
+    ports:
+      - "${API_PORT:-4000}:4000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  client:
+    build:
+      context: ./src/client
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # Browser-side calls go to the published API port on the host.
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+      # Server-side rendering talks to the API over the compose network.
+      INTERNAL_API_URL: http://server:4000
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+
+volumes:
+  db_data:
