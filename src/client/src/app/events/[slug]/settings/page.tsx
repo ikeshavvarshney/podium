@@ -440,27 +440,36 @@ export default function EventSettingsPage() {
           </label>
 
           <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
-            <label className="grid gap-[7px]">
-              <span className="text-ui font-medium">Registration closes</span>
-              <input
-                type="datetime-local"
-                className={FIELD}
-                defaultValue={toLocalInput(event.registrationClosesAt)}
-                disabled={!canEdit}
-                onBlur={(e) => patchEvent({ registrationClosesAt: fromLocalInput(e.target.value) })}
-              />
-            </label>
-            <label className="grid gap-[7px]">
-              <span className="text-ui font-medium">Submission deadline</span>
-              <input
-                type="datetime-local"
-                className={FIELD}
-                defaultValue={toLocalInput(event.submissionDeadline)}
-                disabled={!canEdit}
-                onBlur={(e) => patchEvent({ submissionDeadline: fromLocalInput(e.target.value) })}
-              />
-            </label>
+            {(
+              [
+                ["registrationOpensAt", "Registration opens"],
+                ["registrationClosesAt", "Registration closes"],
+                ["submissionsOpenAt", "Submissions open"],
+                ["submissionDeadline", "Submission deadline"],
+                ["judgingOpensAt", "Judging opens"],
+                ["judgingClosesAt", "Judging closes"],
+                ["votingOpensAt", "Voting opens"],
+                ["votingClosesAt", "Voting closes"],
+              ] as const
+            ).map(([key, label]) => (
+              <label key={key} className="grid gap-[7px]">
+                <span className="text-ui font-medium">{label}</span>
+                <input
+                  type="datetime-local"
+                  className={FIELD}
+                  defaultValue={toLocalInput(event[key])}
+                  disabled={!canEdit}
+                  onBlur={(e) => {
+                    const next = fromLocalInput(e.target.value);
+                    if (next !== (event[key] ?? null)) void patchEvent({ [key]: next });
+                  }}
+                />
+              </label>
+            ))}
           </div>
+          <p className="-mt-2 text-small leading-[1.5] text-muted">
+            The server enforces every window. Leave one empty to have no limit on that side.
+          </p>
 
           <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
             <label className="grid gap-[7px]">
