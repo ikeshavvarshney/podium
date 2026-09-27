@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ApiError, get, patch, post, put } from "@/lib/api";
 import { slugify, type SlugCheck } from "@/lib/slug";
+import { DEFAULT_CRITERIA, DEFAULT_SCALE, clampScale } from "@/lib/rubric";
+import { ScalePicker } from "@/components/event/scale-picker";
 import { ShareLink } from "@/components/event/share-link";
 import { hue } from "@/lib/hues";
 import { Notice } from "@/components/ui/notice";
@@ -38,6 +40,7 @@ interface PrizeRow {
 interface CriterionRow {
   label: string;
   weight: number;
+  hint?: string;
 }
 
 const FIELD =
@@ -88,12 +91,10 @@ export default function CreateEventPage() {
     { title: "Runner-up", amount: "" },
   ]);
 
-  const [criteria, setCriteria] = useState<CriterionRow[]>([
-    { label: "Technical depth", weight: 40 },
-    { label: "Innovation", weight: 25 },
-    { label: "Impact", weight: 20 },
-    { label: "Craft", weight: 15 },
-  ]);
+  const [criteria, setCriteria] = useState<CriterionRow[]>(
+    DEFAULT_CRITERIA.map(({ label, weight, hint }) => ({ label, weight, hint })),
+  );
+  const [scale, setScale] = useState(DEFAULT_SCALE);
 
   const [judgeInput, setJudgeInput] = useState("");
   const [judges, setJudges] = useState<string[]>([]);
@@ -127,6 +128,7 @@ export default function CreateEventPage() {
         setTracks(d.tracks ?? []);
         if (d.prizes) setPrizes(d.prizes);
         if (d.criteria) setCriteria(d.criteria);
+        if (d.scale) setScale(clampScale(d.scale));
         setJudges(d.judges ?? []);
         if (d.eligibility) setEligibility(d.eligibility);
         if (d.visibility) setVisibility(d.visibility);
@@ -146,7 +148,7 @@ export default function CreateEventPage() {
         JSON.stringify({
           name, slug, slugEdited, tagline, description, themeTags, mode, place,
           registrationClosesAt, submissionsOpenAt, submissionDeadline, judgingClosesAt,
-          teamMin, teamMax, tracks, prizes, criteria, judges, eligibility, visibility,
+          teamMin, teamMax, tracks, prizes, criteria, scale, judges, eligibility, visibility,
           reviewsPerSubmission,
         }),
       );
@@ -156,7 +158,7 @@ export default function CreateEventPage() {
   }, [
     restored, name, slug, slugEdited, tagline, description, themeTags, mode, place,
     registrationClosesAt, submissionsOpenAt, submissionDeadline, judgingClosesAt,
-    teamMin, teamMax, tracks, prizes, criteria, judges, eligibility, visibility,
+    teamMin, teamMax, tracks, prizes, criteria, scale, judges, eligibility, visibility,
     reviewsPerSubmission,
   ]);
 
@@ -261,9 +263,10 @@ export default function CreateEventPage() {
             .replace(/^_+|_+$/g, "")
             .slice(0, 40),
           label: c.label.trim(),
+          hint: c.hint?.trim() || null,
           weight: Math.round(c.weight),
           minScore: 1,
-          maxScore: 10,
+          maxScore: scale,
         })),
       });
 
@@ -641,6 +644,9 @@ export default function CreateEventPage() {
 
           {step === 3 ? (
             <div className="mt-3">
+              <div className="border-b border-line py-4">
+                <ScalePicker value={scale} onChange={setScale} />
+              </div>
               {criteria.map((c, i) => (
                 <div key={i} className="flex flex-wrap items-center gap-3 border-b border-line py-[13px]">
                   <input
@@ -648,7 +654,8 @@ export default function CreateEventPage() {
                     className={`${FIELD} min-w-0 flex-[1_1_180px]`}
                     value={c.label}
                     onChange={(e) =>
-                      setCriteria((prev) => prev.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))
+                      // A renamed criterion no longer matches its default guidance for judges.
+                      setCriteria((prev) => prev.map((x, j) => (j === i ? { label: e.target.value, weight: x.weight } : x)))
                     }
                   />
                   <svg viewBox="0 0 100 8" preserveAspectRatio="none" className="block h-2 flex-[1_1_120px]" role="img" aria-label="Weight">
@@ -694,7 +701,7 @@ export default function CreateEventPage() {
               </button>
               <div className="flex items-baseline justify-between gap-4 py-3.5">
                 <span className="text-small leading-[1.5] text-muted">
-                  Judges score each criterion 1-10; weights turn that into one number.
+                  Weights must total 100; they turn each ballot into one number.
                 </span>
                 <span className="font-mono text-ui" style={{ color: weightSum === 100 ? "var(--ac)" : "var(--err)" }}>
                   {weightSum}
@@ -790,7 +797,7 @@ export default function CreateEventPage() {
                 { label: "Reviews per project", value: String(reviewsPerSubmission) },
                 { label: "Tracks", value: tracks.join(", ") || "None" },
                 { label: "Prizes", value: prizes.filter((p) => p.title.trim()).map((p) => p.title).join(", ") || "None" },
-                { label: "Rubric", value: criteria.map((c) => `${c.label} ${c.weight}%`).join(", ") },
+                { label: "Rubric", value: `${criteria.map((c) => `${c.label} ${c.weight}%`).join(", ")}, scored out of ${scale}` },
                 { label: "Judges", value: judges.join(", ") || "None yet" },
                 { label: "Eligibility", value: eligibility },
                 { label: "Visibility", value: visibility === "PUBLIC" ? "Public" : visibility === "UNLISTED" ? "Link only" : "Private" },

@@ -8,6 +8,8 @@ import { EventIntegrations } from "@/components/event/event-integrations";
 import { hue, HUE_NAMES } from "@/lib/hues";
 import type { EventDetail } from "@/lib/types";
 import { MarkdownEditor } from "@/components/ui/markdown-editor";
+import { ScalePicker } from "@/components/event/scale-picker";
+import { DEFAULT_CRITERIA, DEFAULT_SCALE } from "@/lib/rubric";
 import { Notice } from "@/components/ui/notice";
 import { STATUS_LABEL } from "@/lib/hues";
 import { ShareLink } from "@/components/event/share-link";
@@ -97,12 +99,7 @@ export default function EventSettingsPage() {
       setCriteria(
         r?.criteria.length
           ? r.criteria.map((c) => ({ ...c }))
-          : [
-              { key: "technical", label: "Technical depth", hint: "", weight: 40, minScore: 1, maxScore: 5 },
-              { key: "innovation", label: "Innovation", hint: "", weight: 25, minScore: 1, maxScore: 5 },
-              { key: "impact", label: "Impact", hint: "", weight: 20, minScore: 1, maxScore: 5 },
-              { key: "craft", label: "Craft", hint: "", weight: 15, minScore: 1, maxScore: 5 },
-            ],
+          : DEFAULT_CRITERIA.map((c) => ({ ...c, minScore: 1, maxScore: DEFAULT_SCALE })),
       );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not load this event.");
@@ -159,10 +156,16 @@ export default function EventSettingsPage() {
     setCriteria((prev) => prev.map((c, i) => (i === index ? { ...c, ...changes } : c)));
   }
 
+  // One scale for the whole rubric: every criterion is scored 1 to the same number.
+  const scale = criteria[0]?.maxScore ?? DEFAULT_SCALE;
+  function setScale(next: number) {
+    setCriteria((prev) => prev.map((c) => ({ ...c, minScore: 1, maxScore: next })));
+  }
+
   function addCriterion() {
     setCriteria((prev) => [
       ...prev,
-      { key: "", label: "", hint: "", weight: 0, minScore: 1, maxScore: 5 },
+      { key: "", label: "", hint: "", weight: 0, minScore: 1, maxScore: scale },
     ]);
   }
 
@@ -610,6 +613,10 @@ export default function EventSettingsPage() {
             Add, remove or rename criteria freely. Weights must total 100 to save, and judging stays on the last
             saved rubric until then.
           </p>
+        </div>
+
+        <div className="mt-5">
+          <ScalePicker value={scale} onChange={setScale} disabled={locked || !canEdit} />
         </div>
 
         {donut.length ? (
