@@ -31,7 +31,9 @@ export function errorHandler(
       });
       return;
     }
-    if (err.code === "P2025") {
+    // P2023: a malformed id (not a UUID) reached a query. No row can have that id, so it is
+    // the same answer as an id that does not exist.
+    if (err.code === "P2025" || err.code === "P2023") {
       res.status(404).json({ error: { code: "not_found", message: "Not found." } });
       return;
     }
