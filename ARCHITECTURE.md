@@ -145,7 +145,11 @@ investigation without becoming a pile of personal data.
 A fixed-window counter in process memory, keyed by hashed IP. Deliberately not Redis:
 the platform must run as a single API container with the network off, and an extra
 stateful service to throttle a hackathon portal is not a trade worth making. The cost is
-that limits are per-container. That is documented rather than hidden, and the abuse
+that limits are per-container.
+
+The client IP comes from the socket unless `TRUST_PROXY` says a proxy sits in front. The
+compose file publishes the API directly, so trusting `X-Forwarded-For` there would let any
+client pick a fresh IP per request and walk past every limit. That is documented rather than hidden, and the abuse
 protections that actually matter for voting are enforced by database constraints
 instead of by counters.
 
@@ -214,10 +218,14 @@ sequenceDiagram
 
 ## Webhooks
 
-Organizers register a URL and a secret per event (`Webhook`). Selected audit-log actions
-(`RESULTS_PUBLISHED`, `SCORE_SUBMITTED`, and a handful of others) are dispatched to every
-matching webhook as an HMAC-SHA256-signed POST, computed over the raw JSON body with the
-webhook's own secret.
+Organizers register a URL and a secret per event (`Webhook`). Any event-scoped audit-log
+action can be subscribed to, and `*` subscribes to all of them, including actions added
+later. Account-level actions (sign-in, password changes) carry no event and are never
+delivered. Each match is sent as an HMAC-SHA256-signed POST, computed over the raw JSON
+body with the webhook's own secret.
+
+Because dispatch hangs off `recordAudit`, "webhooks cover every action" reduces to "every
+write is audited", which is one rule to keep instead of two lists to keep in sync.
 
 Dispatch happens from `recordAudit` via `setImmediate`, deliberately detached from the
 request that triggered it: an organizer publishing results does not wait on a third

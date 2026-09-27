@@ -156,7 +156,7 @@ erDiagram
 | Table | Purpose |
 | --- | --- |
 | `audit_logs` | Append-only. Carries a machine action, a readable summary, actor, event, target and a hashed IP. |
-| `webhooks` | An organizer-registered URL and secret, per event, subscribed to specific audit actions. |
+| `webhooks` | An organizer-registered URL and secret, per event, subscribed to specific audit actions or to `*` (all of them). |
 | `webhook_deliveries` | One row per dispatch attempt: status code, truncated response body, timestamp. Delivery is fire-and-forget from `recordAudit`, so this table is the only record of what was sent and whether it landed. |
 
 ## Constraints that carry real weight
@@ -234,7 +234,12 @@ The seed script (`src/server/prisma/seed.ts`) also creates the hand-written demo
 idempotent and only ever removes the demo data it created.
 
 Bulk import and export are implemented as T4 work: `POST /events/:id/import/roster`
-accepts a CSV of participants and creates users, teams and memberships in one pass;
-`GET /events/:id/export/*` streams CSV for submissions, scores, votes and the audit log.
+accepts a CSV with an `email` column and optional `name` and `team` columns. It creates
+accounts for new addresses (with a password nobody knows; they sign in by link), grants the
+role, and for participants places each row on its named team, creating the team if needed
+and never breaking the one-team-per-event rule or the event's maximum team size. Rows it
+cannot place are reported with a reason. `GET /events/:id/export/*` streams CSV for
+submissions, teams, judges, scores, results and the audit log, and `export/event.json`
+returns the whole event.
 Both are organizer-only and go through the same `event_memberships` check as everything
 else.

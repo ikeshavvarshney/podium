@@ -15,7 +15,8 @@ This document is a map of what exists and how authorization is layered on top of
 - **Event scope.** Every event-scoped path takes `:eventId` as either a UUID or the
   event's slug; both resolve to the same event.
 - **Errors.** `{ "error": { "code": "STABLE_CODE", "message": "human sentence" } }`, one
-  shape everywhere, rendered by a single error middleware.
+  shape everywhere, rendered by a single error middleware. A malformed id in the path is
+  `404`, the same answer as an id that does not exist.
 - **Idempotent writes.** `PUT` replaces a whole resource (a rubric, a voting config);
   `PATCH` merges named fields; `POST` creates or performs an action.
 - **CSV and JSON exports** stream rather than buffer, so a large event does not hold the
@@ -58,7 +59,7 @@ flowchart LR
 | --- | --- | --- |
 | POST | `/auth/register` | Email + password. Also opens the first session. |
 | POST | `/auth/login` | Constant-time against a dummy hash when the email does not exist. |
-| POST | `/auth/magic-link` | Issues a single-use `SignInToken`; no email is sent, the link is returned to the caller. |
+| POST | `/auth/magic-link` | Issues a single-use `SignInToken`. No email is sent: the link is written to the API log for the operator, and the response is the same whether or not the address exists. |
 | POST | `/auth/magic-link/consume` | Redeems the token, opens a session. |
 | POST | `/auth/logout` | Revokes the current session. |
 | GET | `/auth/me` | The caller's own profile. |
@@ -114,9 +115,9 @@ flowchart LR
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| POST | `/import/roster` | CSV of participants; creates users, teams and memberships in one pass. |
+| POST | `/import/roster` | CSV with `email` and optional `name`, `team`. Creates missing accounts, grants the role, places participants on teams (creating them), and reports every row it could not place. |
 | GET | `/certificates/me`, `/certificates/summary` | Participation certificates. |
-| GET / POST / PATCH / DELETE | `/webhooks`, `/webhooks/:id` | Organizer-managed webhook subscriptions; see `ARCHITECTURE.md` for delivery. |
+| GET / POST / PATCH / DELETE | `/webhooks`, `/webhooks/:id` | Organizer-managed subscriptions to any event-scoped audit action, or `*` for all; `GET` lists what is available. See `ARCHITECTURE.md` for delivery. |
 
 ### `/records` (global, not event-scoped)
 

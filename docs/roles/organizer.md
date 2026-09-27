@@ -53,9 +53,9 @@ gets a role by asking the server for it, and a client can never nominate its own
 | Judge | Granted by email, with an optional track scope | Event admin only |
 | Admin | Granted by email | Event admin only |
 
-Granting by email requires the account to **already exist**. The platform sends no email,
-so an unknown address is reported back rather than invited. Tell the person to create an
-account, then grant the role. The same account can hold several roles in one event, but
+Granting a single role by email requires the account to **already exist**: the platform
+sends no email, so an unknown address is reported back rather than invited. A roster
+import is the exception: it creates the missing accounts, which then sign in by link. The same account can hold several roles in one event, but
 never the same role twice.
 
 ## What an organizer can do
@@ -89,8 +89,10 @@ A **private** event is invisible, returning "not found", to anyone with no membe
 
 ### Manage people and roles (`/events/[slug]/roles`)
 
-- Grant `JUDGE` or `ADMIN` by email; grant `PARTICIPANT` in bulk by importing a CSV roster
-  (up to 1,000 addresses at a time; unknown or invalid addresses are reported, not invited).
+- Grant `JUDGE` or `ADMIN` by email; grant `JUDGE` or `PARTICIPANT` in bulk by importing a
+  CSV roster with `email`, `name` and (for participants) `team` columns, up to 1,000 rows at
+  a time. New addresses get an account, named teams are created, and invalid rows or
+  people who cannot be placed (already on a team, team full) are reported.
 - Give a judge a **track scope**, so they only ever see submissions in those tracks, and
   change it later. An empty scope means all tracks.
 - Revoke a role. The owner's own admin role is protected and cannot be revoked.
@@ -139,8 +141,8 @@ A **private** event is invisible, returning "not found", to anyone with no membe
 - **Audit log**: append-only, readable, with hashed IP addresses.
 - **Exports**: submissions, teams, judges, scores, results and audit as CSV; the whole
   event as JSON.
-- **Webhooks**: HMAC-signed, for submission submitted, score submitted, judge assigned,
-  results published, update posted, vote cast and round changed, with a delivery log.
+- **Webhooks**: HMAC-signed, for any audited action in the event (or all of them), with a
+  delivery log.
 - **Certificates**: see who took part and issue certificates.
 
 ## What an organizer cannot do

@@ -120,8 +120,8 @@ Open the event, then **Settings**.
 2. **Visibility and sharing:** try Public, Link only and Private. Copy the share link and check each one from the private window.
 3. **Voting:** one vote per person is the default. Switch to quadratic and set how many credits each person gets. The credits are required.
 4. **Rubric:** add criteria and weights. The weights must add up to 100 or the app should refuse.
-5. **Webhooks:** add a URL, do something that triggers it, and check the delivery log.
-6. **Bulk import:** upload a small CSV list of people. They should appear under **Roles**.
+5. **Webhooks:** add a URL subscribed to **all events**, do anything in the event (add a FAQ item, post an update), and check the delivery log.
+6. **Bulk import:** upload a CSV with `email,name,team` columns, including one address that has no account and two rows on the same team. The people should appear under **Roles**, the new account should exist, and the team should appear under **Teams**. A row for a full team is reported, not placed.
 7. **Exports:** download the CSV and JSON files.
 8. Add a round, a FAQ item and an announcement. Check that participants can see them.
 

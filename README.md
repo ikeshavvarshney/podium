@@ -94,13 +94,13 @@ npm test                        # runs the suites in the repo-level tests/ folde
 The suite refuses to run unless `DATABASE_URL` points at a database whose name ends in
 `_test`, so a test run cannot truncate development data.
 
-Current coverage: 304 tests across 25 files, unit and integration: authentication
+Current coverage: 315 tests across 26 files, unit and integration: authentication
 (password and passwordless), device sessions, event-scoped RBAC, cross-event isolation,
 role grants and revocation, private-event visibility, team formation and the team board,
 invite-link handling, submission lifecycle, gallery search and filter, server-side
 deadline enforcement, rubric and comparative judging, normalization, voting, webhooks,
-signed judge records, certificates, bulk import, and the fixtures.json import replayed
-against the seven acceptance checker probes.
+signed judge records, certificates, bulk import, request hardening, and the fixtures.json
+import replayed against the seven acceptance checker probes.
 
 ## Permission model
 
@@ -123,14 +123,14 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the request path and
 
 ## Tier status
 
-Claimed honestly in `.dogfood.toml`: T1, T2 and T3. T4 is mostly built but not claimed, because webhooks cover seven event types rather than every action.
+Claimed honestly in `.dogfood.toml`: T1, T2, T3 and T4. The acceptance checker only probes T1 and T2; the T3 and T4 claims rest on the integration tests and on the manual walkthrough in [docs/MANUAL-TESTING.md](docs/MANUAL-TESTING.md).
 
 | Tier | Status |
 | --- | --- |
 | T1 Core | Complete. Auth (password and passwordless), event-scoped roles, events, tracks, prizes, teams, invites, the team board, submissions, deadline enforcement, public gallery with search and filters. |
 | T2 Judging | Complete. Configurable weighted rubrics, judge assignment (manual and auto-balanced), judging console, server-enforced isolation, progress dashboard, cross-judge normalization, CSV export, audit log. |
 | T3 Public | Complete for voting. One vote per person by default, quadratic voting as an option with an organizer-set credit budget (locked once the poll is live), three access modes, hidden tallies, per-voter ballot shuffling, duplicate detection, rate limiting, organizer ballot inspection. Gallery comments with organizer moderation. |
-| T4 Stretch | REST API covering everything the UI does, plus JSON/CSV export, bulk roster import, webhooks with HMAC-signed delivery, an embeddable public gallery, certificate generation and signed/publicly verifiable judge participation records. A published OpenAPI 3.1 document at [docs/openapi.json](docs/openapi.json), also served at `/api/openapi.json`, generated from the live routes and validators. |
+| T4 Stretch | Complete. REST API covering everything the UI does, plus JSON/CSV export, bulk roster import that creates accounts and teams, webhooks with HMAC-signed delivery for every event-scoped action, an embeddable public gallery, certificate generation and signed/publicly verifiable judge participation records. A published OpenAPI 3.1 document at [docs/openapi.json](docs/openapi.json), also served at `/api/openapi.json`, generated from the live routes and validators. |
 | Bonus | Normalization Proof: a seeded simulation showing per-judge standardization recovers the true order better than the raw mean (mean Spearman 0.749 to 0.865, better in 94% of events), reproduced by `npm run proof` in `src/server/` and asserted in CI. See [docs/normalization-proof.md](docs/normalization-proof.md). Comparative (Borda) judging also exists as an alternative scoring mode. |
 
 ### What works right now
@@ -169,24 +169,30 @@ Claimed honestly in `.dogfood.toml`: T1, T2 and T3. T4 is mostly built but not c
 - Append-only audit log covering auth, roles, teams, submissions, judging, voting and
   deadline rejections
 - Rate limiting on authentication, writes, invite acceptance and ballots
-- Bulk roster import from CSV; CSV/JSON export of submissions, teams, scores and results
-- Webhooks: organizer-registered URLs receive HMAC-SHA256-signed deliveries on key audit
-  events. Every delivery attempt is recorded, and the settings page shows the last five per endpoint
+- Bulk roster import from CSV (`email`, `name`, `team`): creates missing accounts, grants the
+  role and places participants on teams; CSV/JSON export of submissions, teams, judges,
+  scores, results and the audit log
+- Webhooks: organizer-registered URLs receive HMAC-SHA256-signed deliveries for any
+  event-scoped audit action, or all of them with `*`. Every delivery attempt is recorded,
+  and the settings page shows the last five per endpoint
 - Signed, publicly verifiable judge participation records, and an embeddable public
   gallery for an event
 - Participation certificates
 
 ### Known limitations
 
-- Webhooks cover seven event types, not every UI action, and delivery is best effort.
+- Webhook delivery is best effort: one attempt, no retry queue. Every attempt is logged.
 - Nothing detects colluding judges or scraping of the public gallery; see the named threats in [docs/SECURITY.md](docs/SECURITY.md).
 - No file uploads. Images are referenced by URL, which keeps the deployment free of
   object storage.
-- Email is not sent. Invites and magic links are shown on-screen for an organizer to
-  distribute however fits their deployment, and email-gated voting does not verify that
-  the address belongs to the voter.
+- Email is not sent. Team invite links are shown on-screen for the team to share, sign-in
+  links are written to the API log for the operator to relay, and email-gated voting does
+  not verify that the address belongs to the voter. Accounts created by a roster import
+  sign in by link, so they depend on that relay too.
 - Rate limiting is in-process, so it is per-container rather than per-cluster. That is a
   deliberate trade to avoid a Redis dependency; see [docs/SECURITY.md](docs/SECURITY.md).
+  Behind a reverse proxy, set `TRUST_PROXY` (a hop count or the proxy's address) so limits
+  key on the real client; left unset, `X-Forwarded-For` is ignored because a client could forge it.
 - `npm audit` reports five advisories in `src/server` (the client has none): Vitest's UI server (dev only, never started) and the Prisma CLI's `deepmerge-ts`, which ships in the image only to run migrations at boot and is never fed request data. Fixing them needs major upgrades of Prisma and Vitest, which are not done.
 
 ## Layout
