@@ -261,12 +261,15 @@ export default function ManageRolesPage() {
           className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-6"
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="scope-title"
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-[420px] rounded-[14px] border border-line bg-surface p-[clamp(20px,3vw,26px)]"
             style={{ animation: "pop 320ms cubic-bezier(0.16,1,0.3,1) both" }}
           >
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-title font-semibold tracking-head">Manage access</h2>
+              <h2 id="scope-title" className="text-title font-semibold tracking-head">Manage access</h2>
               <button
                 type="button"
                 aria-label="Close"
@@ -300,6 +303,7 @@ export default function ManageRolesPage() {
                         type="button"
                         role="switch"
                         aria-checked={on}
+                        aria-label={`Allow ${t.name}`}
                         onClick={() => void toggleTrack(scopeFor, t.id)}
                         className="relative h-6 w-[42px] flex-none rounded-full border p-0 [transition:background-color_420ms_cubic-bezier(0.33,1,0.68,1)_60ms,border-color_260ms]"
                         style={{
