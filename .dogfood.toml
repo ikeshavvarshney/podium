@@ -1,0 +1,38 @@
+# .dogfood.toml, read by the DOGFOOD acceptance checker:  python3 run.py .dogfood.toml
+# Every route below is the API, served by `docker compose up` on port 4000.
+
+[portal]
+base_url = "http://localhost:4000"
+
+[tiers]
+# The checker verifies T1 and T2 only; T3 is claimed on the features and tests described in
+# README.md. T4 is mostly built (REST API with OpenAPI, webhooks, certificates, signed judge
+# records, embeddable gallery, bulk import/export) but not claimed: webhooks cover 7 event types.
+claimed = ["T1", "T2", "T3"]
+pitch = "A self-hostable, API-first hackathon platform with event-scoped roles, weighted rubrics, documented cross-judge normalization and judge isolation enforced in the backend."
+
+[auth]
+# Printed by the seed at boot. Fixed tokens for fixture accounts, valid only with the default
+# JWT_SECRET in docker-compose.yml; a deployment that sets its own secret invalidates them.
+# organizer = organizer@example.org, judge_a = marek.nowak (jdg_08), judge_b = mira.kaur (jdg_19),
+# participant = priya1@example.org (team NorthKiln).
+organizer   = "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMTYyY2UxNy03OTg0LTQ5OTktOGRmNC05MDljOTdhNzZhMWYiLCJ0diI6MCwiaWF0IjoxNzcyMzg4MDAwLCJleHAiOjE4NjY5OTYwMDAsImlzcyI6InBvZGl1bSJ9.xujQj9fBcmeVPD_vH0UhnURNQ84SqEJWRIowmYAkO90"
+judge_a     = "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMjZmNWU2NS0yZDVjLTQzMWItOTM2Ni1jYjg0OTJmMmY2YWIiLCJ0diI6MCwiaWF0IjoxNzcyMzg4MDAwLCJleHAiOjE4NjY5OTYwMDAsImlzcyI6InBvZGl1bSJ9.SglwOB2qfHY-pXHUHGm_n4JA6eIS9xJVzGm7CAxyWFg"
+judge_b     = "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiMTViYTcwMi04MzdlLTQ3MDktYmUzOS05MDI1ZTU1MzUxMTUiLCJ0diI6MCwiaWF0IjoxNzcyMzg4MDAwLCJleHAiOjE4NjY5OTYwMDAsImlzcyI6InBvZGl1bSJ9.ifuDTReP6-EGBN8a9ZmQXq94_YjVP8_KWpHqYSZELC0"
+participant = "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4MzhhMzU5YS01YjgzLTRkNTUtODlmNS1lMTIzMmRiNGJlYTEiLCJ0diI6MCwiaWF0IjoxNzcyMzg4MDAwLCJleHAiOjE4NjY5OTYwMDAsImlzcyI6InBvZGl1bSJ9.fZ9Z74i0e6X3XYtdnprqYSJOHUu6X47v66HNqMVuHhk"
+
+[routes]
+# The fixture event is imported from fixtures.json as "sample-hack-2026".
+gallery      = "/api/events/sample-hack-2026/submissions?take=100"
+submit       = "/api/events/sample-hack-2026/submissions"
+judge_scores = "/api/events/sample-hack-2026/judges/me/scores"
+# judge_a's scores, by account id. Judge B is refused with 403 and the attempt is audited.
+peer_scores  = "/api/events/sample-hack-2026/judges/226f5e65-2d5c-431b-9366-cb8492f2f6ab/scores"
+csv_export   = "/api/events/sample-hack-2026/export/scores.csv"
+
+[project]
+license = "MIT"
+repository = ""
+web = "http://localhost:3000"
+seed_password = "podium-demo-2026"
+bonus = "normalization-proof"   # docs/normalization-proof.md; also present: docs/openapi.json, docs/SECURITY.md threat model
