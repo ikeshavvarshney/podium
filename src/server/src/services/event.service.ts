@@ -68,6 +68,48 @@ export function assertTimelineCoherent(timeline: EventTimeline): void {
   }
 }
 
+/** Lowercase words joined by single hyphens: the part of the event link after /events/. */
+const SLUG_FORMAT = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+/** Paths the web client or the API already use under /events/. */
+const RESERVED_SLUGS = new Set(["new", "slug-availability"]);
+
+/** Why a chosen link cannot be used, or null if its shape is fine. */
+export function slugProblem(slug: string): string | null {
+  if (slug.length < 3 || slug.length > 60) return "An event link is 3 to 60 characters.";
+  if (!SLUG_FORMAT.test(slug)) {
+    return "Use lowercase letters, numbers and single hyphens, with no hyphen at either end.";
+  }
+  // Events are addressed by id or by link, so a link shaped like an id would be ambiguous.
+  if (UUID_SHAPE.test(slug)) return "An event link cannot look like an event id.";
+  if (RESERVED_SLUGS.has(slug)) return "That link is reserved.";
+  return null;
+}
+
+export interface SlugCheck {
+  slug: string;
+  available: boolean;
+  reason?: string;
+  suggestion?: string;
+}
+
+/** Whether an organizer may claim this link. `exceptEventId` lets an event keep its own. */
+export async function checkSlug(slug: string, exceptEventId?: string): Promise<SlugCheck> {
+  const problem = slugProblem(slug);
+  if (problem) return { slug, available: false, reason: problem };
+  const taken = await prisma.event.findUnique({ where: { slug }, select: { id: true } });
+  if (!taken || taken.id === exceptEventId) return { slug, available: true };
+  return { slug, available: false, reason: "Another event already uses this link.", suggestion: await uniqueSlug(slug) };
+}
+
+/** A link the organizer typed is used exactly as typed, or refused; it is never quietly changed. */
+async function claimSlug(slug: string, exceptEventId?: string): Promise<string> {
+  const check = await checkSlug(slug, exceptEventId);
+  if (check.available) return slug;
+  if (check.suggestion) throw conflict(check.reason!, { slug: check.reason, suggestion: check.suggestion });
+  throw badRequest(check.reason!, { slug: check.reason });
+}
+
 async function uniqueSlug(desired: string): Promise<string> {
   const base = slugify(desired) || "event";
   let candidate = base;
@@ -90,7 +132,7 @@ export async function createEvent(user: AuthUser, input: CreateEventInput, ipHas
 
   const event = await prisma.event.create({
     data: {
-      slug: await uniqueSlug(input.slug ?? input.name),
+      slug: input.slug ? await claimSlug(input.slug) : await uniqueSlug(input.name),
       name: input.name.trim(),
       tagline: input.tagline?.trim() || null,
       description: input.description?.trim() || null,
@@ -167,7 +209,9 @@ export async function updateEvent(
   if (input.reviewsPerSubmission !== undefined) {
     data.reviewsPerSubmission = input.reviewsPerSubmission;
   }
-  if (input.slug !== undefined) data.slug = await uniqueSlug(input.slug);
+  if (input.slug !== undefined && input.slug !== ctx.event.slug) {
+    data.slug = await claimSlug(input.slug, ctx.event.id);
+  }
 
   const statusChanged = input.status !== undefined && input.status !== ctx.event.status;
   if (input.status !== undefined) data.status = input.status;

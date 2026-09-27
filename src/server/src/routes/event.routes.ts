@@ -12,6 +12,7 @@ import {
 import { writeRateLimit } from "../middleware/rate-limit.js";
 import { validate } from "../middleware/validate.js";
 import {
+  checkSlug,
   createEvent,
   getEventDetail,
   listPublicEvents,
@@ -52,7 +53,7 @@ const timelineShape = {
 
 const createEventSchema = z.object({
   name: z.string().trim().min(1, "An event name is required.").max(160),
-  slug: z.string().trim().min(1).max(60).optional(),
+  slug: z.string().trim().toLowerCase().max(60).optional(),
   tagline: z.string().trim().max(200).optional(),
   description: z.string().trim().max(20000).optional(),
   themeTags: z.array(z.string().trim().min(1).max(40)).max(12).optional(),
@@ -115,6 +116,17 @@ router.post(
   asyncHandler(async (req, res) => {
     const event = await createEvent(currentUser(req), req.body, req.ipHash);
     res.status(201).json(event);
+  }),
+);
+
+// Declared before "/:eventId", which would otherwise read "slug-availability" as an event.
+router.get(
+  "/slug-availability",
+  requireAuth,
+  requireOrganizerCapability,
+  validate({ query: z.object({ slug: z.string().trim().toLowerCase().max(80) }) }),
+  asyncHandler(async (req, res) => {
+    res.json(await checkSlug(req.query.slug as string));
   }),
 );
 
