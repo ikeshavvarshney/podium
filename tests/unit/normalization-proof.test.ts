@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fixtureEvidence, runProof, simulatePanel, workedExample } from "../../src/server/scripts/normalization-proof.js";
+import { comparativeProof, fixtureEvidence, runProof, simulatePanel, workedExample } from "../../src/server/scripts/normalization-proof.js";
 
 describe("normalization proof", () => {
   it("reproduces: the same seed gives the same panel", () => {
@@ -21,6 +21,12 @@ describe("normalization proof", () => {
     expect(fx.flat.some((f) => f.startsWith("jdg_07"))).toBe(true);
     expect(fx.explained.RAW.judge).toBeGreaterThan(0.2);
     expect(fx.explained.ZSCORE.judge).toBeLessThan(0.1);
+  });
+
+  it("recovers the true order better with Bradley-Terry than with Borda", () => {
+    const c = comparativeProof(120);
+    expect(c.meanSpearman.BRADLEY_TERRY).toBeGreaterThan(c.meanSpearman.BORDA);
+    expect(c.btWins).toBeGreaterThan(0.6);
   });
 
   it("moves projects a raw mean misplaces", () => {

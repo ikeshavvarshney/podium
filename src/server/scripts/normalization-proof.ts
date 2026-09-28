@@ -8,6 +8,8 @@ import {
   type NormalizationMethod,
   type NormalizeOptions,
 } from "../src/algorithms/normalization.js";
+import { bradleyTerry } from "../src/algorithms/bradley-terry.js";
+import { bordaCount } from "../src/algorithms/pairwise.js";
 
 /**
  * Normalization proof: does per-judge standardization recover the true order of
@@ -287,6 +289,34 @@ export function fixtureEvidence() {
   };
 }
 
+/**
+ * Comparative mode: judges order groups of four, each project appears in three groups, and a judge
+ * perceives quality with noise. Which estimator recovers the true order better from the orders?
+ */
+export function comparativeProof(trials = 300, groupSize = 4, noise = 0.6) {
+  const rho = { BORDA: [] as number[], BRADLEY_TERRY: [] as number[] };
+  for (let t = 0; t < trials; t += 1) {
+    const rand = prng(5000 + t);
+    const truth = Array.from({ length: PROJECTS }, () => gaussian(rand));
+    const orders: string[][] = [];
+    for (let round = 0; round < REVIEWS_PER_PROJECT; round += 1) {
+      const shuffled = ids.map((id) => ({ id, k: rand() })).sort((a, b) => a.k - b.k).map((x) => x.id);
+      for (let i = 0; i < shuffled.length; i += groupSize) {
+        const group = shuffled.slice(i, i + groupSize);
+        if (group.length < 2) continue;
+        const seen = group.map((id) => ({ id, q: truth[Number(id.slice(2))]! + gaussian(rand) * noise }));
+        orders.push(seen.sort((a, b) => b.q - a.q).map((x) => x.id));
+      }
+    }
+    const borda = new Map(bordaCount(orders.map((order) => ({ order })), ids).map((r) => [r.submissionId, r.score]));
+    const bt = new Map(bradleyTerry(orders, ids).map((r) => [r.submissionId, r.score]));
+    rho.BORDA.push(spearman(ids.map((id) => borda.get(id) ?? 0), truth));
+    rho.BRADLEY_TERRY.push(spearman(ids.map((id) => bt.get(id) ?? 0), truth));
+  }
+  const wins = rho.BRADLEY_TERRY.filter((v, i) => v > rho.BORDA[i]!).length / trials;
+  return { trials, groupSize, meanSpearman: { BORDA: mean(rho.BORDA), BRADLEY_TERRY: mean(rho.BRADLEY_TERRY) }, btWins: wins };
+}
+
 /** One worked panel: raw versus normalized rank for every project, largest movers first. */
 export function workedExample(seed = 1000) {
   const panel = simulatePanel(seed);
@@ -371,6 +401,19 @@ function report(): string {
     `| Unshrunk | ${fx.movers.unshrunk.map((m) => `${m.title} ${m.raw} to ${m.norm} (${m.low})`).join("; ")} |`,
     "",
     "Without shrinkage, projects read by one- and two-ballot judges make the largest jumps, because those judges are standardized against themselves. Shrinkage takes most of that out.",
+    "",
+  );
+  const cmp = comparativeProof();
+  lines.push("## Comparative mode: Bradley-Terry against Borda", "");
+  lines.push(
+    `Comparative judging asks judges to order groups of ${cmp.groupSize} instead of scoring. ${cmp.trials} simulated events, ${PROJECTS} projects each placed in ${REVIEWS_PER_PROJECT} random groups, judges perceiving quality with noise. Both estimators see the same orders.`,
+    "",
+    "| Estimator | Mean Spearman with the true order |",
+    "| --- | ---: |",
+    `| Borda share of available points | ${f(cmp.meanSpearman.BORDA)} |`,
+    `| Bradley-Terry, MM fit (the ranking podium publishes) | ${f(cmp.meanSpearman.BRADLEY_TERRY)} |`,
+    "",
+    `Bradley-Terry does better in ${(cmp.btWins * 100).toFixed(0)}% of events. It weighs a win by the strength of the project beaten, so a project that drew an easy group is not rewarded for the draw; Borda counts every place the same.`,
     "",
   );
   lines.push("## Why it works, and where it does not", "");

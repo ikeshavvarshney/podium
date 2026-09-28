@@ -138,7 +138,7 @@ Claimed honestly in `.dogfood.toml`: T1, T2, T3 and T4. The acceptance checker o
 | T2 Judging | Complete. Configurable weighted rubrics, judge assignment (manual and auto-balanced), judging console, server-enforced isolation, progress dashboard, cross-judge normalization, CSV export, audit log. |
 | T3 Public | Complete for voting. Approval voting by default (one vote per project, optionally capped, down to one vote per person), quadratic voting as an option with an organizer-set credit budget (locked once the poll is live), three access modes, hidden tallies, per-voter ballot shuffling, duplicate detection, rate limiting, organizer ballot inspection. Gallery comments with organizer moderation. |
 | T4 Stretch | Complete. REST API covering everything the UI does, plus JSON/CSV export, bulk roster import that creates accounts and teams, webhooks with HMAC-signed delivery for every event-scoped action, an embeddable public gallery, certificate generation and signed/publicly verifiable judge participation records. A published OpenAPI 3.1 document at [docs/openapi.json](docs/openapi.json), also served at `/api/openapi.json`, generated from the live routes and validators. |
-| Bonus | Normalization Proof: a seeded simulation showing shrunk per-judge standardization recovers the true order better than the raw mean (mean Spearman 0.749 to 0.889, better in every one of 500 events), plus what it does to `fixtures.json` (the judge effect in raw ballots falls from 27% of variance to 3.5%), reproduced by `npm run proof` in `src/server/` and asserted in CI. See [docs/normalization-proof.md](docs/normalization-proof.md). Comparative (Borda) judging also exists as an alternative scoring mode. |
+| Bonus | Normalization Proof: a seeded simulation showing shrunk per-judge standardization recovers the true order better than the raw mean (mean Spearman 0.749 to 0.889, better in every one of 500 events), plus what it does to `fixtures.json` (the judge effect in raw ballots falls from 27% of variance to 3.5%), reproduced by `npm run proof` in `src/server/` and asserted in CI. See [docs/normalization-proof.md](docs/normalization-proof.md). Pairwise mode: comparative judging ranks with a Bradley-Terry fit (MM algorithm), shown beside Borda and proven better at recovering the true order on the same simulation. |
 
 ### What works right now
 
@@ -162,7 +162,8 @@ Claimed honestly in `.dogfood.toml`: T1, T2, T3 and T4. The acceptance checker o
 - Organizer-authored event rounds/timeline and FAQ
 - Configurable weighted rubrics, refused unless the weights total exactly 100
 - Comparative (pairwise) judging as an alternative to rubric scoring: judges order small
-  groups of projects, combined with a Borda count. See `JUDGING.md`.
+  groups of projects, ranked by a Bradley-Terry fit of the pairwise wins (Borda shown beside it).
+  See `JUDGING.md`.
 - Judge assignment: manual, and a deterministic least-loaded auto-balancer that respects
   track scope, the review target and the no-self-review rule
 - Judging console with per-criterion scoring; the weighted total is computed server-side
@@ -230,7 +231,7 @@ docker-compose.yml  LICENSE  .dogfood.toml
 | --- | --- |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System shape, request path, auth and sessions, authorization, webhooks, signing, trade-offs |
 | [DATA-MODEL.md](DATA-MODEL.md) | Entities, constraints, why roles are event-scoped, migrations, import/export |
-| [JUDGING.md](JUDGING.md) | Rubric weighting, assignment, normalization maths, comparative/Borda ranking, ties, isolation, voting |
+| [JUDGING.md](JUDGING.md) | Rubric weighting, assignment, normalization maths, comparative Bradley-Terry and Borda ranking, ties, isolation, voting |
 | [docs/API.md](docs/API.md) | Route map, conventions, a worked cross-event authorization example |
 | [docs/SECURITY.md](docs/SECURITY.md) | Threat model, trust boundaries, STRIDE, the five named abuse cases (stopped, reduced or not addressed), known limitations |
 | [docs/openapi.json](docs/openapi.json) | OpenAPI 3.1 document, also served at `/api/openapi.json`; regenerate with `npm run openapi` in `src/server/` |

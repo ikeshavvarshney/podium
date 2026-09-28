@@ -315,6 +315,28 @@ sequenceDiagram
     B-->>B: dense rank on score, then points, then appearances
 ```
 
+### Bradley-Terry: the published ranking
+
+Borda counts every place the same, so a project that drew an easy group looks as good as one that
+beat the field. The ranking podium publishes is therefore a Bradley-Terry fit, with Borda kept
+alongside as the "raw" column so an organizer sees where the two disagree:
+
+```
+P(i beats j) = p_i / (p_i + p_j)
+
+each ranking of k projects -> k(k-1)/2 pairwise wins (earlier beats later)
+MM update (Hunter 2004):   p_i <- (W_i + 1) / ( 2/(p_i + 1) + sum_j n_ij / (p_i + p_j) )
+score_i = log p_i, centred so the geometric mean strength is 1
+```
+
+`W_i` is project i's wins and `n_ij` how often i and j met. The `+1` and `2/(p_i + 1)` terms are a
+weak prior: one virtual win and one virtual loss against a reference of strength 1, which keeps an
+unbeaten project finite and connects groups nobody compared across. Every MM step increases the
+likelihood; iteration stops when no strength moves by more than one part in 10^10.
+`algorithms/bradley-terry.ts`. On the seeded simulation in
+[docs/normalization-proof.md](docs/normalization-proof.md), Bradley-Terry recovers the true order
+better than Borda (mean Spearman 0.854 against 0.827).
+
 ### Why, and the cost
 
 Comparative mode sidesteps calibration entirely: a judge is never asked for a number, so

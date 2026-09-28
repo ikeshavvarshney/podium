@@ -59,6 +59,17 @@ Largest rank movements on the fixture:
 
 Without shrinkage, projects read by one- and two-ballot judges make the largest jumps, because those judges are standardized against themselves. Shrinkage takes most of that out.
 
+## Comparative mode: Bradley-Terry against Borda
+
+Comparative judging asks judges to order groups of 4 instead of scoring. 300 simulated events, 40 projects each placed in 3 random groups, judges perceiving quality with noise. Both estimators see the same orders.
+
+| Estimator | Mean Spearman with the true order |
+| --- | ---: |
+| Borda share of available points | 0.827 |
+| Bradley-Terry, MM fit (the ranking podium publishes) | 0.854 |
+
+Bradley-Terry does better in 82% of events. It weighs a win by the strength of the project beaten, so a project that drew an easy group is not rewarded for the draw; Borda counts every place the same.
+
 ## Why it works, and where it does not
 
 - A judge's score is `bias + scale * quality + noise`. Standardizing per judge subtracts the bias and divides out the scale, so two judges who agree on order but not on scale become interchangeable.

@@ -311,8 +311,8 @@ export default function ResultsPage() {
                 <th scope="col" className="w-[42px] py-3 font-normal">#</th>
                 <th scope="col" className="py-3 font-normal">Project</th>
                 <th scope="col" className="w-[110px] py-3 font-normal">Track</th>
-                <th scope="col" className="w-[72px] py-3 text-right font-normal">{preview?.comparative ? "Points %" : "Raw"}</th>
-                <th scope="col" className="w-[80px] py-3 text-right font-normal">{preview?.comparative ? "Borda" : normColLabel}</th>
+                <th scope="col" className="w-[72px] py-3 text-right font-normal">{preview?.comparative ? "Borda %" : "Raw"}</th>
+                <th scope="col" className="w-[80px] py-3 text-right font-normal">{preview?.comparative ? "Bradley-Terry" : normColLabel}</th>
                 <th scope="col" className="w-[82px] py-3 text-right font-normal">Move</th>
                 <th scope="col" className="w-[150px] py-3 text-right font-normal">{preview?.comparative ? "Groups" : "Evaluations"}</th>
               </tr>
@@ -339,7 +339,7 @@ export default function ResultsPage() {
                     <td className="py-[13px] font-mono text-label uppercase tracking-stamp text-muted">{row.track ?? "-"}</td>
                     <td className="py-[13px] text-right font-mono text-ui text-muted">{row.rawMean.toFixed(1)}</td>
                     <td className="py-[13px] text-right font-mono text-ui">
-                      {method === "RANK_AVERAGE" ? row.normalizedValue.toFixed(2) : row.display.toFixed(1)}
+                      {method === "RANK_AVERAGE" || preview?.comparative ? row.normalizedValue.toFixed(2) : row.display.toFixed(1)}
                     </td>
                     <td className="py-[13px] text-right font-mono text-small" style={{ color: moveColor }}>
                       {row.rankDelta === 0 ? "-" : `${row.rankDelta > 0 ? "up" : "down"} ${Math.abs(row.rankDelta)}`}

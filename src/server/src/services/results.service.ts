@@ -1,5 +1,6 @@
 import { JudgingMode, NormalizationMethod, SubmissionStatus } from "@prisma/client";
 import { createHash } from "node:crypto";
+import { bradleyTerry } from "../algorithms/bradley-terry.js";
 import { bordaCount } from "../algorithms/pairwise.js";
 import { displayZ, normalize } from "../algorithms/normalization.js";
 import { prisma } from "../db.js";
@@ -119,10 +120,10 @@ async function computePreview(ctx: EventContext, method: NormalizationMethod) {
 }
 
 /**
- * Comparative events have no per-judge score scale to standardize: judges order small groups
- * and a Borda count combines the orders, already normalized by the points each project could
- * have earned. The same table shape is returned so preview, run and publish work unchanged.
- * All three method choices give this one ranking; raw and normalized values are the same.
+ * Comparative events have no per-judge score scale to standardize: judges order small groups.
+ * The ranking is a Bradley-Terry fit of the pairwise wins those orders imply; the Borda share of
+ * available points is kept as the "raw" column, so the table shows where the two disagree. The
+ * same shape is returned so preview, run and publish work unchanged, whichever method is chosen.
  */
 async function previewComparative(ctx: EventContext, method: NormalizationMethod) {
   const [rankings, submissions] = await Promise.all([
@@ -136,33 +137,38 @@ async function previewComparative(ctx: EventContext, method: NormalizationMethod
     }),
   ]);
   const meta = new Map(submissions.map((x) => [x.id, x]));
-  const rows = bordaCount(
-    rankings.map((r) => ({ order: r.order })),
-    submissions.map((x) => x.id),
-  );
-  const ranked = rows.filter((r) => r.appearances > 0);
+  const ids = submissions.map((x) => x.id);
+  const borda = new Map(bordaCount(rankings.map((r) => ({ order: r.order })), ids).map((r) => [r.submissionId, r]));
+  const fitted = bradleyTerry(rankings.map((r) => r.order), ids);
+  const ranked = new Set(fitted.map((r) => r.submissionId));
   return {
     method,
     comparative: true,
+    estimator: "BRADLEY_TERRY" as const,
     ballotCount: rankings.length,
     judgeStats: [],
-    standings: ranked.map((r) => ({
-      submissionId: r.submissionId,
-      ballotCount: r.appearances,
-      rawMean: Math.round(r.score * 10000) / 100,
-      normalizedValue: Math.round(r.score * 10000) / 10000,
-      rawRank: r.rank,
-      normalizedRank: r.rank,
-      rankDelta: 0,
-      contributions: [],
-      display: Math.round(r.score * 10000) / 10000,
-      name: meta.get(r.submissionId)?.name ?? "Unknown",
-      team: meta.get(r.submissionId)?.team.name ?? null,
-      track: meta.get(r.submissionId)?.track?.name ?? null,
-    })),
-    unranked: rows
-      .filter((r) => r.appearances === 0)
-      .map((r) => ({ submissionId: r.submissionId, name: meta.get(r.submissionId)?.name ?? "Unknown" })),
+    standings: fitted.map((r) => {
+      const b = borda.get(r.submissionId)!;
+      return {
+        submissionId: r.submissionId,
+        ballotCount: b.appearances,
+        rawMean: Math.round(b.score * 10000) / 100,
+        normalizedValue: r.score,
+        rawRank: b.rank,
+        normalizedRank: r.rank,
+        rankDelta: b.rank - r.rank,
+        contributions: [],
+        display: Math.round(r.score * 1000) / 1000,
+        wins: r.wins,
+        comparisons: r.comparisons,
+        name: meta.get(r.submissionId)?.name ?? "Unknown",
+        team: meta.get(r.submissionId)?.team.name ?? null,
+        track: meta.get(r.submissionId)?.track?.name ?? null,
+      };
+    }),
+    unranked: ids
+      .filter((id) => !ranked.has(id))
+      .map((id) => ({ submissionId: id, name: meta.get(id)?.name ?? "Unknown" })),
   };
 }
 
