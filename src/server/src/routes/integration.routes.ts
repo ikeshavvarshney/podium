@@ -10,11 +10,12 @@ import { AuditAction, recordAudit } from "../services/audit.service.js";
 import { buildMyCertificate, certificateSummary } from "../services/certificate.service.js";
 import { importRoster } from "../services/import.service.js";
 import {
+  WEBHOOK_EVENTS,
   createWebhook,
   deleteWebhook,
   listWebhooks,
+  redeliver,
   updateWebhook,
-  WEBHOOK_EVENTS,
 } from "../services/webhook.service.js";
 
 const router: Router = Router({ mergeParams: true });
@@ -148,6 +149,18 @@ router.delete(
       ipHash: req.ipHash,
     });
     res.status(204).end();
+  }),
+);
+
+router.post(
+  "/webhooks/:webhookId/deliveries/:deliveryId/retry",
+  requireAuth,
+  asyncHandler(loadEventContext),
+  requireEventAdmin,
+  writeRateLimit,
+  validate({ params: z.object({ webhookId: z.string().uuid(), deliveryId: z.string().uuid() }).passthrough() }),
+  asyncHandler(async (req, res) => {
+    res.json(await redeliver(eventContext(req), req.params.webhookId as string, req.params.deliveryId as string));
   }),
 );
 

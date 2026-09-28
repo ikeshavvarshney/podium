@@ -2,7 +2,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { verifyPayload } from "../../src/server/src/lib/signing.js";
-import { signBody } from "../../src/server/src/services/webhook.service.js";
+import { signDelivery } from "../../src/server/src/services/webhook.service.js";
 import {
   anon,
   as,
@@ -104,8 +104,11 @@ describe("integrations", () => {
       expect(received).toHaveLength(1);
       const [delivery] = received;
       expect(delivery!.headers["x-podium-event"]).toBe("EVENT_UPDATE_POSTED");
-      expect(delivery!.headers["x-podium-signature"]).toBe(`sha256=${signBody(secret, delivery!.body)}`);
-      expect(JSON.parse(delivery!.body).eventId).toBe(event.id);
+      const deliveryId = delivery!.headers["x-podium-delivery"] as string;
+      const timestamp = delivery!.headers["x-podium-timestamp"] as string;
+      expect(Math.abs(Date.now() / 1000 - Number(timestamp))).toBeLessThan(60);
+      expect(delivery!.headers["x-podium-signature"]).toBe(`sha256=${signDelivery(secret, timestamp, deliveryId, delivery!.body)}`);
+      expect(JSON.parse(delivery!.body)).toMatchObject({ id: deliveryId, eventId: event.id });
 
       // The delivery row is written after the receiver answers, so poll rather than sleep.
       let logged = await prisma.webhookDelivery.findMany();
@@ -164,6 +167,33 @@ describe("integrations", () => {
       const failed = await prisma.webhookDelivery.findMany({ where: { ok: false } });
       expect(failed.length).toBeGreaterThan(0);
       expect(failed[0]!.error).toBeTruthy();
+
+      const queued = await prisma.webhookOutbox.findFirstOrThrow({ where: { id: failed[0]!.outboxId! } });
+      expect(queued).toMatchObject({ status: "PENDING", attempts: 1 });
+      expect(queued.nextAttemptAt.getTime()).toBeGreaterThan(Date.now());
+    });
+
+    it("retries a queued delivery and records every attempt", async () => {
+      const queued = await prisma.webhookOutbox.findFirstOrThrow({ where: { status: "PENDING" } });
+      const hook = await prisma.webhook.findUniqueOrThrow({ where: { id: queued.webhookId } });
+      await prisma.webhook.update({ where: { id: hook.id }, data: { url: receiverUrl } });
+
+      const res = await as(organizer)
+        .post(`/api/events/${event.id}/webhooks/${hook.id}/deliveries/${queued.id}/retry`)
+        .expect(200);
+      expect(res.body).toMatchObject({ status: "DELIVERED", attempts: 2 });
+      const attempts = await prisma.webhookDelivery.findMany({ where: { outboxId: queued.id }, orderBy: { attempt: "asc" } });
+      expect(attempts.map((a) => [a.attempt, a.ok])).toEqual([
+        [1, false],
+        [2, true],
+      ]);
+    });
+
+    it("keeps one delivery id across retries so a receiver can deduplicate", async () => {
+      const delivered = await prisma.webhookOutbox.findFirstOrThrow({ where: { status: "DELIVERED", attempts: 2 } });
+      const seen = received.filter((r) => r.headers["x-podium-delivery"] === delivered.id);
+      expect(seen).toHaveLength(1);
+      expect(seen[0]!.headers["x-podium-attempt"]).toBe("2");
     });
   });
 

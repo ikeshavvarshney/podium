@@ -205,9 +205,9 @@ than claim coverage the code does not have.
 - **No email delivery.** Magic links and invites are shown on-screen rather than mailed,
   because the platform runs with the network off by requirement. A self-hosted deployment
   relays them however fits its own environment.
-- **Webhook delivery is best-effort.** A failing or slow receiving endpoint cannot fail
-  the action that triggered it, by design, but that also means delivery is not
-  guaranteed; `WebhookDelivery` records every attempt so a gap is diagnosable, not silent.
+- **Webhook retries are bounded.** A delivery is retried five times over about two and a half
+  hours, then marked failed for a manual retry. Outbound requests refuse private and internal
+  addresses (SSRF), and signatures bind a timestamp and delivery id (replay).
 - **The acceptance checker tokens in `.dogfood.toml` are public.** The checker never signs in,
   so the seed stores four fixed API tokens for fixture accounts. Each is scoped to the fixture
   event: inside `sample-hack-2026` it acts as its account, anywhere else it authenticates as

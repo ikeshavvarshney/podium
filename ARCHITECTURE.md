@@ -238,8 +238,10 @@ sequenceDiagram
 Organizers register a URL and a secret per event (`Webhook`). Any event-scoped audit-log
 action can be subscribed to, and `*` subscribes to all of them, including actions added
 later. Account-level actions (sign-in, password changes) carry no event and are never
-delivered. Each match is sent as an HMAC-SHA256-signed POST, computed over the raw JSON
-body with the webhook's own secret.
+delivered. Each match is sent as a POST whose `x-podium-signature` is HMAC-SHA256, with the
+webhook's own secret, over `timestamp.deliveryId.body`. `x-podium-timestamp` and
+`x-podium-delivery` carry the first two, so a receiver can reject a stale timestamp and a delivery
+id it has already seen, which is what stops a captured request being replayed.
 
 Because dispatch hangs off `recordAudit`, "webhooks cover every action" reduces to "every
 write is audited", which is one rule to keep instead of two lists to keep in sync.
@@ -247,9 +249,21 @@ write is audited", which is one rule to keep instead of two lists to keep in syn
 Dispatch happens from `recordAudit` via `setImmediate`, deliberately detached from the
 request that triggered it: an organizer publishing results does not wait on a third
 party's server, and a slow or failing webhook cannot fail the action that caused it.
-Every attempt, successful or not, is written to `WebhookDelivery` with the response status
-and a truncated body, so a failure is diagnosable from the product rather than the
-organizer's own server logs.
+
+Delivery is an outbox. Each owed notification is a `webhook_outbox` row, written before the
+first attempt, so a crash or a dead receiver leaves a retry behind rather than a lost event.
+Failures (network errors, 5xx, 408, 429) are retried after 10 s, 1 min, 5 min, 30 min and
+2 h; other 4xx answers are final. A worker in every API process claims due rows with
+`FOR UPDATE SKIP LOCKED`, so running several replicas never double-sends. Each attempt is
+logged in `webhook_deliveries`, the settings screen shows what is queued or gave up, and
+an organizer can retry any delivery by hand.
+
+Outbound requests go through `lib/outbound.ts`. A URL is refused if it is not http(s), is a
+single-label or `.local`/`.internal` name (container DNS resolves `db` to Postgres), or
+resolves to a loopback, private, link-local, CGNAT or cloud-metadata address. The same
+check runs again at connect time through a guarded DNS lookup, so a hostname cannot pass at
+registration and be re-pointed inward later, and redirects are never followed.
+`WEBHOOK_ALLOW_PRIVATE=true` lifts this for local development.
 
 ## Frontend
 

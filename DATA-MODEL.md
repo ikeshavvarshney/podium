@@ -91,7 +91,8 @@ erDiagram
     JUDGE_SCORES ||--o{ CRITERION_SCORES : "broken down into"
     NORMALIZATION_RUNS ||--o{ NORMALIZED_SCORES : produces
     EVENTS ||--o{ WEBHOOKS : notifies
-    WEBHOOKS ||--o{ WEBHOOK_DELIVERIES : logs
+    WEBHOOKS ||--o{ WEBHOOK_OUTBOX : owes
+    WEBHOOK_OUTBOX ||--o{ WEBHOOK_DELIVERIES : attempts
 ```
 
 ### Identity
@@ -157,7 +158,8 @@ erDiagram
 | --- | --- |
 | `audit_logs` | Append-only by trigger, and hash-chained per event (`chain_seq`, `prev_hash`, `hash`). Carries a machine action, a readable summary, actor, event, target, metadata and a hashed IP. |
 | `webhooks` | An organizer-registered URL and secret, per event, subscribed to specific audit actions or to `*` (all of them). |
-| `webhook_deliveries` | One row per dispatch attempt: status code, truncated response body, timestamp. Delivery is fire-and-forget from `recordAudit`, so this table is the only record of what was sent and whether it landed. |
+| `webhook_outbox` | One row per notification owed to one webhook: the signed body, status (`PENDING`, `DELIVERED`, `FAILED`), attempts and the next attempt time. Its id is the delivery id receivers deduplicate on. |
+| `webhook_deliveries` | One row per attempt, linked to its outbox row: attempt number, status code, error, duration. |
 
 ## Constraints that carry real weight
 

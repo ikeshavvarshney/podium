@@ -7687,6 +7687,71 @@
         "x-required-role": "event admin"
       }
     },
+    "/api/events/{eventId}/webhooks/{webhookId}/deliveries/{deliveryId}/retry": {
+      "post": {
+        "operationId": "post_api_events_eventId_webhooks_webhookId_deliveries_deliveryId_retry",
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "POST /api/events/{eventId}/webhooks/{webhookId}/deliveries/{deliveryId}/retry",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success. The body is JSON unless the route exports a file."
+          },
+          "400": {
+            "description": "Validation failed. `error.details` maps field names to messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in."
+          },
+          "403": {
+            "description": "Signed in but not permitted."
+          },
+          "404": {
+            "description": "Not found, or hidden from this caller."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-required-role": "event admin"
+      }
+    },
     "/api/events/{eventId}/voting/config": {
       "get": {
         "operationId": "get_api_events_eventId_voting_config",

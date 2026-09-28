@@ -10,7 +10,17 @@ interface Delivery {
   statusCode: number | null;
   ok: boolean;
   error: string | null;
+  attempt: number;
   createdAt: string;
+}
+
+interface Queued {
+  id: string;
+  action: string;
+  status: "PENDING" | "FAILED";
+  attempts: number;
+  nextAttemptAt: string;
+  lastError: string | null;
 }
 
 interface Webhook {
@@ -20,6 +30,7 @@ interface Webhook {
   active: boolean;
   secretHint: string;
   deliveries: Delivery[];
+  outbox: Queued[];
 }
 
 const eventLabel = (evt: string) => (evt === "*" ? "all events" : evt.toLowerCase().replace(/_/g, "."));
@@ -121,6 +132,15 @@ export function EventIntegrations({ slug, canEdit }: { slug: string; canEdit: bo
     }
   }
 
+  async function retry(hook: Webhook, item: Queued) {
+    try {
+      await post(`/events/${slug}/webhooks/${hook.id}/deliveries/${item.id}/retry`);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "That delivery could not be retried.");
+    }
+  }
+
   async function importFile(file: File) {
     setError("");
     setImportResult(null);
@@ -173,8 +193,10 @@ export function EventIntegrations({ slug, canEdit }: { slug: string; canEdit: bo
         <>
           <div className="mt-6 text-ui font-medium">Webhooks</div>
           <p className="mt-1.5 max-w-[62ch] text-small leading-[1.6] text-muted">
-            Each delivery is a JSON POST signed with HMAC-SHA256 in <code className="font-mono">x-podium-signature</code>.
-            Deliveries run after the action completes, so a slow receiver never slows an organizer down.
+            Each delivery is a JSON POST. <code className="font-mono">x-podium-signature</code> is HMAC-SHA256 of{" "}
+            <code className="font-mono">timestamp.delivery.body</code>, from the <code className="font-mono">x-podium-timestamp</code>{" "}
+            and <code className="font-mono">x-podium-delivery</code> headers: reject stale timestamps and repeated ids to stop replays.
+            Deliveries are queued and retried with backoff for about two and a half hours, and private or internal addresses are refused.
             Every audited action in this event can be subscribed to; <code className="font-mono">all events</code>{" "}
             also covers actions added in later versions.
           </p>
@@ -260,7 +282,28 @@ export function EventIntegrations({ slug, canEdit }: { slug: string; canEdit: bo
                           {d.statusCode ?? "failed"}
                         </span>
                         <span className="text-muted">{d.action.toLowerCase()}</span>
+                        {d.attempt > 1 ? <span className="text-muted">attempt {d.attempt}</span> : null}
                         <span className="ml-auto text-muted">{new Date(d.createdAt).toLocaleTimeString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {hook.outbox?.length ? (
+                  <div className="mt-2 grid gap-1 border-t border-line pt-2">
+                    {hook.outbox.map((q) => (
+                      <div key={q.id} className="flex flex-wrap items-center gap-2.5 font-mono text-label">
+                        <span style={{ color: q.status === "FAILED" ? "var(--err)" : "var(--warn-fg)" }}>
+                          {q.status === "FAILED" ? "gave up" : "retrying"}
+                        </span>
+                        <span className="text-muted">{q.action.toLowerCase()}</span>
+                        <span className="min-w-0 flex-1 truncate text-muted">
+                          {q.attempts} attempt{q.attempts === 1 ? "" : "s"}
+                          {q.lastError ? ` · ${q.lastError}` : ""}
+                          {q.status === "PENDING" ? ` · next ${new Date(q.nextAttemptAt).toLocaleTimeString()}` : ""}
+                        </span>
+                        <button type="button" onClick={() => void retry(hook, q)} className="underline">
+                          retry now
+                        </button>
                       </div>
                     ))}
                   </div>

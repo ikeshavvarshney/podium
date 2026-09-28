@@ -27,6 +27,11 @@ const EnvSchema = z.object({
     .transform((v) => v === "true"),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
   PUBLIC_WEB_URL: z.string().default("http://localhost:3000"),
+  /** Lets webhooks reach private and loopback addresses. For local development only. */
+  WEBHOOK_ALLOW_PRIVATE: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
   SEED_ON_BOOT: z
     .enum(["true", "false"])
     .default("false")

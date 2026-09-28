@@ -8,6 +8,7 @@ export const app: Express = createApp();
 /** Order matters: children before parents. */
 const TABLES = [
   "api_tokens",
+  "webhook_outbox",
   "webhook_deliveries",
   "webhooks",
   "criterion_scores",

@@ -121,7 +121,16 @@ flowchart LR
 | --- | --- | --- |
 | POST | `/import/roster` | CSV with `email` and optional `name`, `team`. Creates missing accounts, grants the role, places participants on teams (creating them), and reports every row it could not place. |
 | GET | `/certificates/me`, `/certificates/summary` | Participation certificates. |
-| GET / POST / PATCH / DELETE | `/webhooks`, `/webhooks/:id` | Organizer-managed subscriptions to any event-scoped audit action, or `*` for all; `GET` lists what is available. See `ARCHITECTURE.md` for delivery. |
+| GET / POST / PATCH / DELETE | `/webhooks`, `/webhooks/:id` | Organizer-managed subscriptions to any event-scoped audit action, or `*` for all; `GET` lists what is available, recent attempts, and anything queued or failed. URLs that resolve to internal addresses are refused. |
+| POST | `/webhooks/:id/deliveries/:deliveryId/retry` | Re-queue one delivery and attempt it now. |
+
+Verifying a delivery, in any language:
+
+```js
+const expected = "sha256=" + hmacSha256Hex(secret, `${headers["x-podium-timestamp"]}.${headers["x-podium-delivery"]}.${rawBody}`);
+const fresh = Math.abs(Date.now() / 1000 - Number(headers["x-podium-timestamp"])) < 300;
+accept = timingSafeEqual(expected, headers["x-podium-signature"]) && fresh && !alreadySeen(headers["x-podium-delivery"]);
+```
 
 ### `/records` (global, not event-scoped)
 

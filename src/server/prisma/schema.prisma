@@ -974,14 +974,46 @@ model Webhook {
 
   event      Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
   deliveries WebhookDelivery[]
+  outbox     WebhookOutbox[]
 
   @@index([eventId])
   @@map("webhooks")
 }
 
+enum WebhookOutboxStatus {
+  PENDING
+  DELIVERED
+  FAILED
+}
+
+/// One notification owed to one webhook. Its id is the delivery id receivers deduplicate on;
+/// it is retried with backoff until delivered or out of attempts.
+model WebhookOutbox {
+  id            String              @id @default(uuid()) @db.Uuid
+  webhookId     String              @map("webhook_id") @db.Uuid
+  action        String
+  body          String
+  status        WebhookOutboxStatus @default(PENDING)
+  attempts      Int                 @default(0)
+  nextAttemptAt DateTime            @default(now()) @map("next_attempt_at")
+  lastError     String?             @map("last_error")
+  deliveredAt   DateTime?           @map("delivered_at")
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  webhook  Webhook           @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  attemptLog WebhookDelivery[]
+
+  @@index([status, nextAttemptAt])
+  @@index([webhookId, createdAt])
+  @@map("webhook_outbox")
+}
+
+/// One delivery attempt.
 model WebhookDelivery {
   id         String   @id @default(uuid()) @db.Uuid
   webhookId  String   @map("webhook_id") @db.Uuid
+  outboxId   String?  @map("outbox_id") @db.Uuid
+  attempt    Int      @default(1)
   action     String
   statusCode Int?     @map("status_code")
   ok         Boolean  @default(false)
@@ -989,7 +1021,8 @@ model WebhookDelivery {
   durationMs Int?     @map("duration_ms")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  webhook Webhook        @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  outbox  WebhookOutbox? @relation(fields: [outboxId], references: [id], onDelete: Cascade)
 
   @@index([webhookId, createdAt])
   @@map("webhook_deliveries")

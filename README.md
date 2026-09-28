@@ -183,15 +183,17 @@ Claimed honestly in `.dogfood.toml`: T1, T2, T3 and T4. The acceptance checker o
   role and places participants on teams; CSV/JSON export of submissions, teams, judges,
   scores, results and the audit log
 - Webhooks: organizer-registered URLs receive HMAC-SHA256-signed deliveries for any
-  event-scoped audit action, or all of them with `*`. Every delivery attempt is recorded,
-  and the settings page shows the last five per endpoint
+  event-scoped audit action, or all of them with `*`. Signatures bind a timestamp and delivery
+  id against replay; deliveries are queued and retried with backoff; internal addresses are
+  refused; every attempt is recorded and any delivery can be retried from the settings page
 - Signed, publicly verifiable judge participation records, and an embeddable public
   gallery for an event
 - Participation certificates
 
 ### Known limitations
 
-- Webhook delivery is best effort: one attempt, no retry queue. Every attempt is logged.
+- Webhook retries stop after six attempts over about two and a half hours; after that a
+  delivery is marked failed and waits for a manual retry.
 - Nothing detects colluding judges or scraping of the public gallery; see the named threats in [docs/SECURITY.md](docs/SECURITY.md).
 - No file uploads. Images are referenced by URL, which keeps the deployment free of
   object storage.
