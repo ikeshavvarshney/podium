@@ -59,7 +59,7 @@ flowchart LR
 | --- | --- | --- |
 | POST | `/auth/register` | Email + password. Also opens the first session. |
 | POST | `/auth/login` | Constant-time against a dummy hash when the email does not exist. |
-| POST | `/auth/magic-link` | Issues a single-use `SignInToken`. No email is sent: the link is written to the API log for the operator, and the response is the same whether or not the address exists. |
+| POST | `/auth/magic-link` | Issues a single-use `SignInToken`, mailed when `SMTP_URL` is set and written to the API log otherwise. The response is the same whether or not the address exists. |
 | POST | `/auth/magic-link/consume` | Redeems the token, opens a session. |
 | POST | `/auth/logout` | Revokes the current session. |
 | GET | `/auth/session` | The web client's session check: the caller's profile and event roles, or `{ user: null }` when signed out. Never 401. |
@@ -111,7 +111,8 @@ flowchart LR
 | Method | Path | Notes |
 | --- | --- | --- |
 | GET / PUT | `/voting/config` | Access mode, method, credit budget, result hiding, and who may vote (`allowVisitors`, `allowParticipants`, `allowJudges`, `allowAdmins`; at least one must stay true). |
-| GET | `/voting/ballot` | A shuffled, per-voter-stable ballot order. |
+| GET | `/voting/ballot` | A shuffled, per-voter-stable ballot order. Sets the open-link device cookie. |
+| POST | `/voting/verify`, `/voting/verify/confirm` | Email-gated voting: send a six-digit code, then trade it for a voter token (returned and set as a cookie; scripts send it as `x-voter-token`). |
 | POST | `/votes` | Priced and validated server-side; see `JUDGING.md` for the quadratic-voting cost function. |
 | GET | `/votes/ballots`, `/votes/results` | Organizer-only while `hideResults` is set and the window is open. |
 

@@ -131,11 +131,12 @@ that backs the claim.
 *Attack:* create many accounts to inflate community votes or fill a team board.
 
 - **What exists.** `POST /auth/register`, `/auth/login` and `/auth/magic-link` share a limiter of
-  20 attempts per 15 minutes per hashed client address (`authRateLimit`). Accounts are
+  ceiling of 300 attempts per 15 minutes per hashed client address (`authRateLimit`), and failed
+  sign-ins are limited per account and address. Accounts are
   event-scoped for anything that matters: a new account holds no judge or admin role anywhere,
   because roles come only from `event_memberships` rows an organizer grants.
-- **What does not.** Registration needs no email verification, because the platform sends no
-  email (it must run offline). One person with several addresses or IPs can hold several accounts.
+- **What does not.** Registration needs no email verification, because the platform must work
+  offline with no mail server. One person with several addresses or IPs can hold several accounts.
   Signed-in voting therefore counts accounts, not people, and a quadratic budget is granted per
   account. The vote panel flags several voters behind one address for a human decision.
 - **Recommendation.** For a vote that decides a prize, use signed-in voting, read the flags, and
@@ -146,14 +147,15 @@ that backs the claim.
 *Attack:* cast many ballots as one voter, or replay a ballot.
 
 - **Stopped for identified voters.** A voter is identified server-side (`resolveVoter`): account id,
-  verified-by-address email, or hashed IP. `votes` is unique per `(event, voter key, submission)`
+  an email address proved with a one-time code, or a browser cookie capped per address. `votes` is unique per `(event, voter key, submission)`
   and a new ballot **replaces** the previous one in a transaction, so re-submitting cannot stack.
   A client cannot nominate the identity it votes as. Own-team votes and cross-event submissions
   are refused. Weight, credits, budget and method are validated and priced on the server; a client
   `credits` figure is ignored. The method and budget lock once a ballot exists.
-- **Reduced elsewhere.** Ballots are limited to 60 per hour per hashed address. Open-link voting
-  identifies a voter only by address, and email-gated voting proves nothing about who owns the
-  address, so a determined attacker with many addresses succeeds. Tallies stay hidden until the
+- **Reduced elsewhere.** Ballots are limited to 60 per hour per hashed address, and open-link voting
+  admits a configurable number of new voters per address per hour. Email-gated voting proves
+  control of each address with a code, but one person can control several, so a determined
+  attacker with many addresses still succeeds. Tallies stay hidden until the
   window closes, which removes the feedback an attacker needs to tune a campaign. Every rejected
   ballot is audited (`VOTE_REJECTED`).
 
@@ -200,12 +202,12 @@ than claim coverage the code does not have.
   `RATE_LIMIT_STORE=postgres` so replicas share windows through the database, with no Redis.
   Sign-in limits count failures per account and address, so a crowded venue behind one NAT
   address is not locked out; see `ARCHITECTURE.md`.
-- **Email-gated and open-link voting do not prove identity.** Neither mode defends
-  against a determined attacker with several addresses or IPs. The honest recommendation
+- **Email-gated and open-link voting do not prove personhood.** A code proves control of an
+  address and a cookie identifies a browser; neither stops one person holding several. The honest recommendation
   for anything that decides a prize is `AUTHENTICATED` voting; see `JUDGING.md` section 9.
-- **No email delivery.** Magic links and invites are shown on-screen rather than mailed,
-  because the platform runs with the network off by requirement. A self-hosted deployment
-  relays them however fits its own environment.
+- **Email needs an SMTP server.** With `SMTP_URL` set, sign-in links and voting codes are mailed.
+  Without it the platform stays offline and writes them to the API log for the operator to relay,
+  and team invite links are shown on-screen.
 - **Webhook retries are bounded.** A delivery is retried five times over about two and a half
   hours, then marked failed for a manual retry. Outbound requests refuse private and internal
   addresses (SSRF), and signatures bind a timestamp and delivery id (replay).

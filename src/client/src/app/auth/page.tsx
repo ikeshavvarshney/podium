@@ -84,6 +84,7 @@ function SignInForm() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [linkState, setLinkState] = useState<"idle" | "working" | "issued" | "failed">("idle");
+  const [linkVia, setLinkVia] = useState<"email" | "log">("log");
 
   const next = params.get("next");
   const destination = safeNext(next);
@@ -151,7 +152,8 @@ function SignInForm() {
     setErrors({});
     setLinkState("working");
     try {
-      await post("/auth/magic-link", { email: form.email.trim() });
+      const res = await post<{ delivered: "email" | "log" }>("/auth/magic-link", { email: form.email.trim() });
+      setLinkVia(res.delivered);
       setLinkState("issued");
     } catch (err) {
       if (err instanceof ApiError && err.details?.email) setErrors({ email: err.details.email });
@@ -313,10 +315,12 @@ function SignInForm() {
               </button>
               <div role="status" className="mt-2 text-small leading-[1.55] text-muted">
                 {linkState === "issued"
-                  ? "If that address has an account, a one-time link was issued. podium sends no email: the link is printed in the server log, so ask whoever runs this instance for it. It works once and expires after 15 minutes."
+                  ? linkVia === "email"
+                    ? "If that address has an account, a one-time link is on its way by email. It works once and expires after 15 minutes."
+                    : "If that address has an account, a one-time link was issued. This instance has no mail server, so the link is in the server log: ask whoever runs it. It works once and expires after 15 minutes."
                   : linkState === "failed"
                     ? "The link could not be requested. Check the address and try again."
-                    : "podium sends no email. The link is printed in the server log for whoever runs this instance."}
+                    : "We email a single-use link, or, on an instance without a mail server, print it in the server log."}
               </div>
               <p className="mt-3 text-small leading-[1.55] text-muted">
                 Demo instance: the seeded accounts use the password{" "}

@@ -4,6 +4,7 @@ import { AUTH_COOKIE, config } from "../config.js";
 import { prisma } from "../db.js";
 import { asyncHandler } from "../lib/async-handler.js";
 import { forbidden } from "../lib/errors.js";
+import { mailDelivery, sendMail } from "../lib/mailer.js";
 import { currentUser, requireAuth } from "../middleware/auth.js";
 import {
   assertLoginAllowed,
@@ -109,10 +110,19 @@ router.post(
     const issued = await issueSignInToken(req.body.email, req.ipHash);
     if (issued) {
       const url = `${config.PUBLIC_WEB_URL}/auth/link?token=${issued.token}`;
-      console.log(`[auth] sign-in link for ${issued.user.name}: ${url}`);
+      await sendMail({
+        to: req.body.email,
+        subject: "Your podium sign-in link",
+        text: `Hi ${issued.user.name},
+
+Sign in with this single-use link, valid for 15 minutes:
+${url}
+
+If you did not ask for it, ignore this message.`,
+      }).catch((err) => console.error("[mail] sign-in link failed", err));
     }
     res.status(202).json({
-      delivered: "log",
+      delivered: mailDelivery(),
       message: "If that address has an account, a sign-in link is on its way.",
     });
   }),

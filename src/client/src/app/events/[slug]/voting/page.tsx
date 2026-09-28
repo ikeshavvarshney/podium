@@ -23,6 +23,7 @@ interface VotingConfig {
   allowJudges: boolean;
   allowAdmins: boolean;
   maxVotesPerIpPerHour: number;
+  maxChoices: number | null;
   methodLocked?: boolean;
   lockReason?: string | null;
 }
@@ -220,7 +221,7 @@ export default function VotingManagerPage() {
                   className="pill disabled:cursor-not-allowed disabled:opacity-60"
                   style={on ? { background: h.bg, color: h.fg, borderColor: "transparent" } : undefined}
                 >
-                  {m === "QUADRATIC" ? "Quadratic" : "One vote per person"}
+                  {m === "QUADRATIC" ? "Quadratic" : "Headcount"}
                 </button>
               );
             })}
@@ -230,6 +231,28 @@ export default function VotingManagerPage() {
               ? "Each voter holds a credit budget that you set, and buys weight on a project at weight squared credits. Backing one project with weight 3 costs 9; spreading 1 across three projects costs 3."
               : "Each voter may back a project once, for one unit of weight. The tally is a headcount. This is the default."}
           </p>
+          {config.method === "SINGLE" && !choosingQuadratic ? (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <label htmlFor="max-choices" className="text-ui font-medium">
+                Projects each voter may back
+              </label>
+              <select
+                id="max-choices"
+                disabled={config.methodLocked}
+                value={config.maxChoices ?? ""}
+                onChange={(e) => void save({ maxChoices: e.target.value ? Number(e.target.value) : null })}
+                className="rounded-[10px] border border-line bg-surface px-3 py-2 font-mono text-small outline-none focus:border-muted disabled:opacity-60"
+              >
+                <option value="">Any number</option>
+                <option value="1">One (one vote per person)</option>
+                {[2, 3, 5].map((n) => (
+                  <option key={n} value={n}>
+                    Up to {n}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           {config.methodLocked ? (
             <p role="status" className="mt-2 max-w-[62ch] text-small leading-[1.55] text-muted">
               Locked: {config.lockReason}
@@ -272,6 +295,29 @@ export default function VotingManagerPage() {
                   Use quadratic voting
                 </button>
               ) : null}
+            </div>
+          ) : null}
+
+          {config.access === "OPEN_LINK" ? (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <label htmlFor="per-address" className="text-ui font-medium">
+                New voters per address per hour
+              </label>
+              <input
+                id="per-address"
+                type="number"
+                min={1}
+                max={10000}
+                defaultValue={config.maxVotesPerIpPerHour}
+                onBlur={(e) => {
+                  const value = Number(e.target.value);
+                  if (value >= 1 && value !== config.maxVotesPerIpPerHour) void save({ maxVotesPerIpPerHour: value });
+                }}
+                className="w-[110px] rounded-[10px] border border-line bg-surface px-3 py-2 font-mono text-small outline-none focus:border-muted"
+              />
+              <span className="max-w-[46ch] text-small leading-[1.5] text-muted">
+                Each browser gets its own ballot, so a venue on one network still works; this caps how many a single address can add.
+              </span>
             </div>
           ) : null}
 
@@ -334,8 +380,8 @@ export default function VotingManagerPage() {
             {config.access === "AUTHENTICATED"
               ? "Voters are identified by their account. This is the strongest identity available."
               : config.access === "EMAIL_GATED"
-                ? "Voters give an email address, which becomes their identity for duplicate detection."
-                : "Anyone with the link may vote, identified only by a hashed client address. Weakest identity: lean on the rate limit."}
+                ? "Voters confirm an email address with a six-digit code before their ballot counts; the address is their identity. Codes go by SMTP when configured, otherwise to the server log."
+                : "Anyone with the link may vote, one ballot per browser, capped per address. Weakest identity: prefer signed-in voting for anything that decides a prize."}
           </p>
 
           <div className="mt-6">

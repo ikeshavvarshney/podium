@@ -1,5 +1,5 @@
 import { EventStatus, SubmissionStatus, VotingAccess, VotingMethod } from "@prisma/client";
-import { createHash } from "node:crypto";
+import { createHash, randomInt } from "node:crypto";
 import {
   BallotError,
   priceBallot,
@@ -8,7 +8,9 @@ import {
   type BallotEntry,
 } from "../algorithms/voting.js";
 import { prisma } from "../db.js";
-import { badRequest, conflict, forbidden, notFound } from "../lib/errors.js";
+import { hashToken, randomToken } from "../lib/crypto.js";
+import { badRequest, conflict, forbidden, notFound, tooManyRequests, unauthorized } from "../lib/errors.js";
+import { sendMail } from "../lib/mailer.js";
 import { AuditAction, recordAudit, recordAuditSafe } from "./audit.service.js";
 import type { EventContext } from "./authorization.service.js";
 
@@ -31,6 +33,7 @@ const DEFAULT_CONFIG = {
   allowJudges: false,
   allowAdmins: false,
   maxVotesPerIpPerHour: 60,
+  maxChoices: null as number | null,
 };
 
 export async function getVotingConfig(eventId: string) {
@@ -46,7 +49,7 @@ export async function votingMethodLock(ctx: EventContext): Promise<{ locked: boo
   const config = await getVotingConfig(ctx.event.id);
   const ballots = await prisma.vote.count({ where: { eventId: ctx.event.id } });
   if (ballots > 0) {
-    return { locked: true, reason: "Ballots have already been cast, so the method and credit budget can no longer change." };
+    return { locked: true, reason: "Ballots have already been cast, so the method, credit budget and choice limit can no longer change." };
   }
   if (config.enabled && votingWindow(ctx.event, config).open) {
     return { locked: true, reason: "The poll is live. Close it before changing the method or credit budget." };
@@ -68,7 +71,8 @@ export async function upsertVotingConfig(
   const current = await getVotingConfig(ctx.event.id);
   const changesMethod = input.method !== undefined && input.method !== current.method;
   const changesBudget = input.creditBudget !== undefined && input.creditBudget !== current.creditBudget;
-  if (changesMethod || changesBudget) {
+  const changesChoices = input.maxChoices !== undefined && input.maxChoices !== current.maxChoices;
+  if (changesMethod || changesBudget || changesChoices) {
     const lock = await votingMethodLock(ctx);
     if (lock.locked) throw conflict(lock.reason ?? "The voting method is locked.");
   }
@@ -133,6 +137,12 @@ export interface VoterIdentity {
   voterEmail: string | null;
 }
 
+/** What the request proves about an anonymous voter: a verified address, and a device cookie. */
+export interface VoterClaims {
+  verifiedEmail?: string | null;
+  deviceId?: string | null;
+}
+
 interface VoterRoles {
   allowVisitors: boolean;
   allowParticipants: boolean;
@@ -179,7 +189,7 @@ export function voterRoleProblem(
 export function resolveVoter(
   ctx: EventContext,
   config: VoterRoles & { access: VotingAccess },
-  email: string | undefined,
+  claims: VoterClaims,
   ipHash: string | undefined,
 ): VoterIdentity {
   const problem = voterRoleProblem(ctx, config);
@@ -190,13 +200,13 @@ export function resolveVoter(
   }
 
   if (config.access === VotingAccess.EMAIL_GATED) {
-    const normalized = (email ?? "").trim().toLowerCase();
-    if (!normalized) throw badRequest("An email address is required to vote in this event.");
-    return { voterKey: `email:${normalized}`, userId: null, voterEmail: normalized };
+    if (!claims.verifiedEmail) throw unauthorized("Confirm your email address with the code we send before voting.");
+    return { voterKey: `email:${claims.verifiedEmail}`, userId: null, voterEmail: claims.verifiedEmail };
   }
 
-  // OPEN_LINK: the best identity available is the hashed client address. It is
-  // weak on purpose, and the event's own rate limit is what bounds abuse.
+  // OPEN_LINK: one ballot per browser, so people sharing a venue's address do not overwrite each
+  // other. Clearing cookies mints a new voter, which the per-address cap and the flags bound.
+  if (claims.deviceId) return { voterKey: `device:${claims.deviceId}`, userId: null, voterEmail: null };
   if (!ipHash) throw badRequest("This ballot could not be attributed to a voter.");
   return { voterKey: `ip:${ipHash}`, userId: null, voterEmail: null };
 }
@@ -217,14 +227,14 @@ async function listVotableSubmissions(eventId: string) {
 }
 
 /** The ballot a voter sees: ordering is per voter, and never the storage order. */
-export async function getBallot(ctx: EventContext, email?: string, ipHash?: string) {
+export async function getBallot(ctx: EventContext, claims: VoterClaims = {}, ipHash?: string) {
   const config = await getVotingConfig(ctx.event.id);
   const window = votingWindow(ctx.event, config);
   const submissions = await listVotableSubmissions(ctx.event.id);
 
   let voter: VoterIdentity | null = null;
   try {
-    voter = resolveVoter(ctx, config, email, ipHash);
+    voter = resolveVoter(ctx, config, claims, ipHash);
   } catch {
     voter = null;
   }
@@ -244,7 +254,11 @@ export async function getBallot(ctx: EventContext, email?: string, ipHash?: stri
     method: config.method,
     access: config.access,
     creditBudget: config.creditBudget,
+    maxChoices: config.maxChoices,
     creditsSpent: existing.reduce((sum, v) => sum + v.credits, 0),
+    /** Email-gated and not yet verified: the ballot page asks for the address and a code first. */
+    needsVerification: config.access === VotingAccess.EMAIL_GATED && !ctx.user && !claims.verifiedEmail,
+    verifiedEmail: ctx.user ? null : (claims.verifiedEmail ?? null),
     hideResults: config.hideResults,
     /** Set when this caller's roles rule them out, so the ballot page can say why up front. */
     ineligibleReason: voterRoleProblem(ctx, config),
@@ -255,7 +269,6 @@ export async function getBallot(ctx: EventContext, email?: string, ipHash?: stri
 
 export interface CastBallotInput {
   entries: BallotEntry[];
-  email?: string;
 }
 
 /**
@@ -266,6 +279,7 @@ export interface CastBallotInput {
 export async function castBallot(
   ctx: EventContext,
   input: CastBallotInput,
+  claims: VoterClaims,
   ipHash?: string,
   userAgent?: string,
 ) {
@@ -284,7 +298,30 @@ export async function castBallot(
     throw forbidden(window.reason ?? "Community voting is closed.");
   }
 
-  const voter = resolveVoter(ctx, config, input.email, ipHash);
+  const voter = resolveVoter(ctx, config, claims, ipHash);
+
+  if (!ctx.user && config.access === VotingAccess.OPEN_LINK && ipHash) {
+    const others = await prisma.vote.findMany({
+      where: {
+        eventId: ctx.event.id,
+        ipHash,
+        voterKey: { not: voter.voterKey },
+        createdAt: { gte: new Date(Date.now() - 60 * 60_000) },
+      },
+      distinct: ["voterKey"],
+      select: { voterKey: true },
+    });
+    if (others.length >= config.maxVotesPerIpPerHour) {
+      recordAuditSafe({
+        action: AuditAction.VOTE_REJECTED,
+        eventId: ctx.event.id,
+        targetType: "vote",
+        summary: `Ballot rejected: ${others.length} voters from one address in the last hour`,
+        ipHash,
+      });
+      throw tooManyRequests("Too many different voters from this address in the last hour.");
+    }
+  }
 
   const votable = await listVotableSubmissions(ctx.event.id);
   const allowed = new Set(votable.map((s) => s.id));
@@ -315,7 +352,7 @@ export async function castBallot(
 
   let priced;
   try {
-    priced = priceBallot(config.method, config.creditBudget, input.entries);
+    priced = priceBallot(config.method, config.creditBudget, input.entries, config.maxChoices);
   } catch (err) {
     if (err instanceof BallotError) {
       recordAuditSafe({
@@ -434,4 +471,83 @@ export async function listBallots(ctx: EventContext) {
         ? "Several voters share this address"
         : null,
   }));
+}
+
+// ----------------------------------------------------------------
+// Email-gated voter verification
+// ----------------------------------------------------------------
+
+const CODE_TTL_MS = 15 * 60_000;
+const TOKEN_TTL_MS = 30 * 24 * 60 * 60_000;
+const MAX_CODE_ATTEMPTS = 5;
+
+const codeHash = (eventId: string, email: string, code: string) => hashToken(`${eventId}:${email}:${code}`);
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+/** Sends a six-digit code to the address. Only email-gated events take part. */
+export async function requestVoterCode(ctx: EventContext, rawEmail: string, ipHash?: string) {
+  const config = await getVotingConfig(ctx.event.id);
+  if (!config.enabled || config.access !== VotingAccess.EMAIL_GATED) {
+    throw badRequest("This event does not use email-gated voting.");
+  }
+  const email = normalizeEmail(rawEmail);
+  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+  await prisma.voterVerification.deleteMany({ where: { eventId: ctx.event.id, email, verifiedAt: null } });
+  await prisma.voterVerification.create({
+    data: {
+      eventId: ctx.event.id,
+      email,
+      codeHash: codeHash(ctx.event.id, email, code),
+      expiresAt: new Date(Date.now() + CODE_TTL_MS),
+      ipHash: ipHash ?? null,
+    },
+  });
+  const delivered = await sendMail({
+    to: email,
+    subject: `Your voting code for ${ctx.event.name}`,
+    text: `Your code is ${code}. It expires in 15 minutes. If you did not ask to vote in ${ctx.event.name}, ignore this message.`,
+  });
+  return { delivered };
+}
+
+/** Exchanges a correct code for a voter token, which proves the address on later ballots. */
+export async function confirmVoterCode(ctx: EventContext, rawEmail: string, code: string, ipHash?: string) {
+  const email = normalizeEmail(rawEmail);
+  const pending = await prisma.voterVerification.findFirst({
+    where: { eventId: ctx.event.id, email, verifiedAt: null, expiresAt: { gt: new Date() } },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!pending) throw badRequest("That code has expired. Ask for a new one.");
+  if (pending.attempts >= MAX_CODE_ATTEMPTS) throw tooManyRequests("Too many wrong codes. Ask for a new one.");
+
+  if (pending.codeHash !== codeHash(ctx.event.id, email, code.trim())) {
+    await prisma.voterVerification.update({ where: { id: pending.id }, data: { attempts: { increment: 1 } } });
+    recordAuditSafe({
+      action: AuditAction.VOTE_REJECTED,
+      eventId: ctx.event.id,
+      targetType: "voter_verification",
+      summary: "Wrong email verification code entered",
+      ipHash,
+    });
+    throw badRequest("That code is not right.");
+  }
+
+  const token = randomToken(32);
+  await prisma.voterVerification.update({
+    where: { id: pending.id },
+    data: { verifiedAt: new Date(), tokenHash: hashToken(token) },
+  });
+  return { token, email };
+}
+
+/** The verified address behind a voter token, if the token is valid for this event. */
+export async function resolveVoterToken(ctx: EventContext, token: string | undefined): Promise<string | null> {
+  if (!token) return null;
+  const row = await prisma.voterVerification.findUnique({
+    where: { tokenHash: hashToken(token) },
+    select: { eventId: true, email: true, verifiedAt: true },
+  });
+  if (!row || row.eventId !== ctx.event.id || !row.verifiedAt) return null;
+  if (Date.now() - row.verifiedAt.getTime() > TOKEN_TTL_MS) return null;
+  return row.email;
 }

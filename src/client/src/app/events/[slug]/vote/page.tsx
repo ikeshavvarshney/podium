@@ -23,7 +23,10 @@ interface BallotView {
   method: "SINGLE" | "QUADRATIC";
   access: "OPEN_LINK" | "EMAIL_GATED" | "AUTHENTICATED";
   creditBudget: number;
+  maxChoices: number | null;
   creditsSpent: number;
+  needsVerification: boolean;
+  verifiedEmail: string | null;
   hideResults: boolean;
   /** Why this viewer's roles rule them out of voting, if they do. */
   ineligibleReason: string | null;
@@ -39,23 +42,21 @@ export default function VotePage() {
   const [ballot, setBallot] = useState<BallotView | null>(null);
   const [weights, setWeights] = useState<Record<string, number>>({});
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(
-    async (withEmail?: string) => {
-      try {
-        const query = withEmail ? `?email=${encodeURIComponent(withEmail)}` : "";
-        const view = await get<BallotView>(`/events/${slug}/voting/ballot${query}`);
-        setBallot(view);
-        setWeights(Object.fromEntries(view.myVotes.map((v) => [v.submissionId, v.weight])));
-      } catch (err) {
-        setError(err instanceof ApiError ? err.message : "The ballot could not be loaded.");
-      }
-    },
-    [slug],
-  );
+  const load = useCallback(async () => {
+    try {
+      const view = await get<BallotView>(`/events/${slug}/voting/ballot`);
+      setBallot(view);
+      setWeights(Object.fromEntries(view.myVotes.map((v) => [v.submissionId, v.weight])));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "The ballot could not be loaded.");
+    }
+  }, [slug]);
 
   useEffect(() => {
     void load();
@@ -79,7 +80,31 @@ export default function VotePage() {
   const over = ballot.method === "QUADRATIC" && spent > budget;
   const ineligible = ballot.ineligibleReason;
   const needsAccount = !user && (ballot.access === "AUTHENTICATED" || Boolean(ineligible));
-  const needsEmail = !user && !needsAccount && ballot.access === "EMAIL_GATED";
+  const needsEmail = !user && !needsAccount && ballot.needsVerification;
+  const backed = Object.values(weights).filter((w) => w > 0).length;
+  const overChoices = ballot.method === "SINGLE" && ballot.maxChoices !== null && backed > ballot.maxChoices;
+
+  async function sendCode() {
+    setError("");
+    try {
+      await post(`/events/${slug}/voting/verify`, { email: email.trim() });
+      setCodeSent(true);
+      setNotice(`A six-digit code is on its way to ${email.trim()}.`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "The code could not be sent.");
+    }
+  }
+
+  async function confirmCode() {
+    setError("");
+    try {
+      await post(`/events/${slug}/voting/verify/confirm`, { email: email.trim(), code: code.trim() });
+      setNotice("Address confirmed. You can vote now.");
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "That code was not accepted.");
+    }
+  }
 
   function setWeight(id: string, next: number) {
     setWeights((prev) => ({ ...prev, [id]: Math.max(0, next) }));
@@ -94,16 +119,13 @@ export default function VotePage() {
         submissionId,
         weight,
       }));
-      const res = await post<{ creditsSpent: number; creditsRemaining: number }>(
-        `/events/${slug}/votes`,
-        { entries, ...(needsEmail ? { email } : {}) },
-      );
+      const res = await post<{ creditsSpent: number; creditsRemaining: number }>(`/events/${slug}/votes`, { entries });
       setNotice(
         ballot!.method === "QUADRATIC"
           ? `Ballot recorded. ${res.creditsSpent} credits spent, ${res.creditsRemaining} left.`
           : "Ballot recorded.",
       );
-      await load(needsEmail ? email : undefined);
+      await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "That ballot was refused.");
     } finally {
@@ -122,7 +144,11 @@ export default function VotePage() {
           <p className="mt-3 max-w-[60ch] text-body leading-[1.6] text-muted">
             {ballot.method === "QUADRATIC"
               ? `You hold ${budget} credits. Backing a project with weight w costs w squared credits, so concentrating on one favourite is deliberately expensive. This is not one person, one vote.`
-              : "One vote per project. The tally is a headcount."}{" "}
+              : ballot.maxChoices === 1
+                ? "One vote per person: back the single project you think should win."
+                : ballot.maxChoices
+                  ? `Back up to ${ballot.maxChoices} projects. The tally is a headcount.`
+                  : "One vote per project. The tally is a headcount."}{" "}
             {ballot.hideResults ? "Standings stay hidden until voting closes." : ""}
           </p>
         </div>
@@ -162,18 +188,44 @@ export default function VotePage() {
 
       {needsEmail ? (
         <div className="mt-6 grid max-w-[420px] gap-2">
-          <label className="text-ui font-medium">Your email</label>
-          <input
-            className="rounded-[10px] border border-line bg-surface px-[13px] py-2.5 font-mono text-small outline-none focus:border-muted"
-            placeholder="you@example.org"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onBlur={() => email && void load(email)}
-          />
+          <label htmlFor="voter-email" className="text-ui font-medium">
+            Confirm your email to vote
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="voter-email"
+              type="email"
+              className="min-w-0 flex-1 rounded-[10px] border border-line bg-surface px-[13px] py-2.5 font-mono text-small outline-none focus:border-muted"
+              placeholder="you@example.org"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <button type="button" onClick={() => void sendCode()} disabled={!email.trim()} className="btn btn-sm disabled:opacity-40">
+              {codeSent ? "Resend" : "Send code"}
+            </button>
+          </div>
+          {codeSent ? (
+            <div className="flex gap-2">
+              <input
+                aria-label="Six-digit code"
+                inputMode="numeric"
+                maxLength={6}
+                className="min-w-0 flex-1 rounded-[10px] border border-line bg-surface px-[13px] py-2.5 font-mono text-small tracking-[0.3em] outline-none focus:border-muted"
+                placeholder="000000"
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+              />
+              <button type="button" onClick={() => void confirmCode()} disabled={code.length !== 6} className="btn-primary btn-sm disabled:opacity-40">
+                Confirm
+              </button>
+            </div>
+          ) : null}
           <span className="text-small leading-[1.5] text-muted">
-            Your address is the identity used for duplicate detection, and is visible to the organizer.
+            Your address is your voter identity: one ballot per address, visible to the organizer.
           </span>
         </div>
+      ) : ballot.verifiedEmail ? (
+        <p className="mt-6 text-small text-muted">Voting as {ballot.verifiedEmail}.</p>
       ) : null}
 
       {error ? (
@@ -253,7 +305,7 @@ export default function VotePage() {
         <button
           type="button"
           onClick={() => void submit()}
-          disabled={busy || over || !ballot.window.open || needsAccount || Boolean(ineligible) || (needsEmail && !email)}
+          disabled={busy || over || overChoices || !ballot.window.open || needsAccount || Boolean(ineligible) || needsEmail}
           className="btn-primary disabled:opacity-40"
         >
           {busy ? "Submitting..." : "Submit ballot"}
@@ -261,7 +313,9 @@ export default function VotePage() {
         <span className="text-small leading-[1.5] text-muted">
           {over
             ? `That ballot costs ${spent} credits, which is over your budget of ${budget}.`
-            : "Submitting replaces your previous ballot in full."}
+            : overChoices
+              ? `You can back at most ${ballot.maxChoices} project${ballot.maxChoices === 1 ? "" : "s"}.`
+              : "Submitting replaces your previous ballot in full."}
         </span>
       </div>
     </main>

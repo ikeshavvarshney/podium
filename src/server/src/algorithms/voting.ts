@@ -51,6 +51,7 @@ export function priceBallot(
   method: VotingMethod,
   creditBudget: number,
   entries: BallotEntry[],
+  maxChoices: number | null = null,
 ): BallotCost {
   const seen = new Set<string>();
   const priced = entries.map((entry) => {
@@ -64,6 +65,15 @@ export function priceBallot(
       credits: creditCost(method, entry.weight),
     };
   });
+
+  const backed = priced.filter((e) => e.weight > 0).length;
+  if (method === "SINGLE" && maxChoices !== null && backed > maxChoices) {
+    throw new BallotError(
+      maxChoices === 1
+        ? "This event allows one vote per person: back a single project."
+        : `This event lets each voter back at most ${maxChoices} projects.`,
+    );
+  }
 
   const creditsSpent = priced.reduce((sum, e) => sum + e.credits, 0);
   const budget = method === "SINGLE" ? Number.POSITIVE_INFINITY : creditBudget;

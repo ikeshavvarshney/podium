@@ -72,6 +72,17 @@ describe("ballot pricing", () => {
     ]);
     expect(priced.creditsSpent).toBe(3);
   });
+
+  it("holds single voting to a choice limit when one is set", () => {
+    const three = [
+      { submissionId: "a", weight: 1 },
+      { submissionId: "b", weight: 1 },
+      { submissionId: "c", weight: 0 },
+    ];
+    expect(() => priceBallot("SINGLE", 100, three, 1)).toThrow(BallotError);
+    expect(priceBallot("SINGLE", 100, three, 2).creditsSpent).toBe(2);
+    expect(priceBallot("SINGLE", 100, three, null).creditsSpent).toBe(2);
+  });
 });
 
 describe("tally", () => {

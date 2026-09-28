@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { rateLimitStore } from "../../src/server/src/middleware/rate-limit.js";
 import {
   anon,
@@ -191,36 +191,140 @@ describe("community voting", () => {
       .expect(403);
   });
 
-  it("identifies an email-gated voter by their address, not by a client-supplied id", async () => {
-    const gated = await createEvent(organizer, { name: "Gated Voting", submissionDeadline: FUTURE });
-    const project = await submitProject(
-      await createUser({ name: "Gated Builder" }),
-      gated.id,
-      "Gated Team",
-      "Gated Project",
-    );
-    await as(organizer)
-      .put(`/api/events/${gated.id}/voting/config`)
-      .send({ enabled: true, access: "EMAIL_GATED", method: "SINGLE" })
-      .expect(200);
+  describe("email-gated voting", () => {
+    let gated: { id: string; slug: string };
+    let project: string;
 
-    await anon()
-      .post(`/api/events/${gated.id}/votes`)
-      .send({ entries: [{ submissionId: project, weight: 1 }] })
-      .expect(400);
+    /** The code goes to the API log when no SMTP server is configured. */
+    async function requestCode(email: string): Promise<string> {
+      const spy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      try {
+        const res = await anon().post(`/api/events/${gated.id}/voting/verify`).send({ email }).expect(202);
+        expect(res.body.delivered).toBe("log");
+        const line = spy.mock.calls.map((c) => String(c[0])).find((m) => m.includes(email.toLowerCase()));
+        return /code is (\d{6})/.exec(line ?? "")![1]!;
+      } finally {
+        spy.mockRestore();
+      }
+    }
 
-    await anon()
-      .post(`/api/events/${gated.id}/votes`)
-      .send({ email: "Someone@Example.test", entries: [{ submissionId: project, weight: 1 }] })
-      .expect(201);
+    beforeAll(async () => {
+      gated = await createEvent(organizer, { name: "Gated Voting", submissionDeadline: FUTURE });
+      project = await submitProject(await createUser({ name: "Gated Builder" }), gated.id, "Gated Team", "Gated Project");
+      await as(organizer)
+        .put(`/api/events/${gated.id}/voting/config`)
+        .send({ enabled: true, access: "EMAIL_GATED", method: "SINGLE" })
+        .expect(200);
+    });
 
-    await anon()
-      .post(`/api/events/${gated.id}/votes`)
-      .send({ email: "someone@example.test", entries: [{ submissionId: project, weight: 1 }] })
-      .expect(201);
+    it("refuses a ballot from an address nobody has proved", async () => {
+      await anon().post(`/api/events/${gated.id}/votes`).send({ entries: [{ submissionId: project, weight: 1 }] }).expect(401);
+      const ballot = await anon().get(`/api/events/${gated.id}/voting/ballot`).expect(200);
+      expect(ballot.body.needsVerification).toBe(true);
+    });
 
-    const rows = await prisma.vote.findMany({ where: { eventId: gated.id } });
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.voterKey).toBe("email:someone@example.test");
+    it("counts a wrong code against the address and refuses it", async () => {
+      const code = await requestCode("mallory@example.test");
+      const wrong = code === "000000" ? "111111" : "000000";
+      await anon().post(`/api/events/${gated.id}/voting/verify/confirm`).send({ email: "mallory@example.test", code: wrong }).expect(400);
+      const row = await prisma.voterVerification.findFirstOrThrow({ where: { email: "mallory@example.test" } });
+      expect(row.attempts).toBe(1);
+    });
+
+    it("identifies a verified voter by their address, and keeps one ballot per address", async () => {
+      const code = await requestCode("Someone@Example.test");
+      const confirmed = await anon()
+        .post(`/api/events/${gated.id}/voting/verify/confirm`)
+        .send({ email: "someone@example.test", code })
+        .expect(200);
+      const token = confirmed.body.token as string;
+
+      for (let i = 0; i < 2; i++) {
+        await anon()
+          .post(`/api/events/${gated.id}/votes`)
+          .set("x-voter-token", token)
+          .send({ entries: [{ submissionId: project, weight: 1 }] })
+          .expect(201);
+      }
+      const rows = await prisma.vote.findMany({ where: { eventId: gated.id } });
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.voterKey).toBe("email:someone@example.test");
+
+      const ballot = await anon().get(`/api/events/${gated.id}/voting/ballot`).set("x-voter-token", token).expect(200);
+      expect(ballot.body).toMatchObject({ needsVerification: false, verifiedEmail: "someone@example.test" });
+      expect(ballot.body.myVotes).toHaveLength(1);
+    });
+
+    it("does not reveal how an address voted to someone who only knows the address", async () => {
+      const ballot = await anon().get(`/api/events/${gated.id}/voting/ballot?email=someone@example.test`).expect(200);
+      expect(ballot.body.myVotes).toEqual([]);
+    });
+
+    it("does not accept a voter token from another event", async () => {
+      const code = await requestCode("elsewhere@example.test");
+      const { body } = await anon()
+        .post(`/api/events/${gated.id}/voting/verify/confirm`)
+        .send({ email: "elsewhere@example.test", code })
+        .expect(200);
+      await anon()
+        .post(`/api/events/${event.id}/votes`)
+        .set("x-voter-token", body.token)
+        .send({ entries: [{ submissionId: projectA, weight: 1 }] })
+        .expect((res) => expect(res.status).not.toBe(201));
+    });
+  });
+
+  describe("open-link voting", () => {
+    let open: { id: string; slug: string };
+    let projects: string[];
+    const device = (id: string) => `podium_voter_device=${id}`;
+
+    beforeAll(async () => {
+      open = await createEvent(organizer, { name: "Open Voting", submissionDeadline: FUTURE });
+      projects = [
+        await submitProject(await createUser({ name: "Open A" }), open.id, "Open Team A", "Open Project A"),
+        await submitProject(await createUser({ name: "Open B" }), open.id, "Open Team B", "Open Project B"),
+      ];
+      await as(organizer)
+        .put(`/api/events/${open.id}/voting/config`)
+        .send({ enabled: true, access: "OPEN_LINK", method: "SINGLE", maxVotesPerIpPerHour: 2 })
+        .expect(200);
+      await rateLimitStore.reset();
+    });
+
+    it("gives each browser on a shared address its own ballot", async () => {
+      const first = await anon().get(`/api/events/${open.id}/voting/ballot`).expect(200);
+      expect(String(first.headers["set-cookie"])).toContain("podium_voter_device=");
+
+      await anon().post(`/api/events/${open.id}/votes`).set("Cookie", device("00000000-0000-4000-8000-000000000001")).send({ entries: [{ submissionId: projects[0], weight: 1 }] }).expect(201);
+      await anon().post(`/api/events/${open.id}/votes`).set("Cookie", device("00000000-0000-4000-8000-000000000002")).send({ entries: [{ submissionId: projects[1], weight: 1 }] }).expect(201);
+      const rows = await prisma.vote.findMany({ where: { eventId: open.id } });
+      expect(new Set(rows.map((r) => r.voterKey)).size).toBe(2);
+    });
+
+    it("caps how many different voters one address can add in an hour", async () => {
+      await anon().post(`/api/events/${open.id}/votes`).set("Cookie", device("00000000-0000-4000-8000-000000000003")).send({ entries: [{ submissionId: projects[0], weight: 1 }] }).expect(429);
+      // A voter already counted may still change their ballot.
+      await anon().post(`/api/events/${open.id}/votes`).set("Cookie", device("00000000-0000-4000-8000-000000000001")).send({ entries: [{ submissionId: projects[1], weight: 1 }] }).expect(201);
+    });
+  });
+
+  describe("choice limit", () => {
+    it("holds a voter to the organizer's limit on how many projects they back", async () => {
+      const capped = await createEvent(organizer, { name: "Capped Voting", submissionDeadline: FUTURE });
+      const a = await submitProject(await createUser({ name: "Cap A" }), capped.id, "Cap Team A", "Cap Project A");
+      const b = await submitProject(await createUser({ name: "Cap B" }), capped.id, "Cap Team B", "Cap Project B");
+      await as(organizer)
+        .put(`/api/events/${capped.id}/voting/config`)
+        .send({ enabled: true, access: "AUTHENTICATED", method: "SINGLE", maxChoices: 1 })
+        .expect(200);
+      const res = await as(voter)
+        .post(`/api/events/${capped.id}/votes`)
+        .send({ entries: [{ submissionId: a, weight: 1 }, { submissionId: b, weight: 1 }] })
+        .expect(400);
+      expect(res.body.error.message).toContain("one vote per person");
+      await as(voter).post(`/api/events/${capped.id}/votes`).send({ entries: [{ submissionId: a, weight: 1 }] }).expect(201);
+      await as(organizer).put(`/api/events/${capped.id}/voting/config`).send({ maxChoices: 2 }).expect(409);
+    });
   });
 });

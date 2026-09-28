@@ -34,6 +34,12 @@ const EnvSchema = z.object({
     .transform((v) => v === "true"),
   /** Where rate-limit windows live: this process, or Postgres so every replica shares them. */
   RATE_LIMIT_STORE: z.enum(["memory", "postgres"]).default("memory"),
+  /** e.g. smtp://user:pass@mail.example.org:587. Unset, mail is written to the API log. */
+  SMTP_URL: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim() ? v.trim() : undefined)),
+  MAIL_FROM: z.string().default("podium <no-reply@localhost>"),
   SEED_ON_BOOT: z
     .enum(["true", "false"])
     .default("false")

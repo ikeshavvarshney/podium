@@ -51,6 +51,8 @@ services:
       SEED_ON_BOOT: ${SEED_ON_BOOT:-true}
       FIXTURE_TOKENS: ${FIXTURE_TOKENS:-true}
       RATE_LIMIT_STORE: ${RATE_LIMIT_STORE:-memory}
+      SMTP_URL: ${SMTP_URL:-}
+      MAIL_FROM: ${MAIL_FROM:-podium <no-reply@localhost>}
       WEBHOOK_ALLOW_PRIVATE: ${WEBHOOK_ALLOW_PRIVATE:-false}
       FIXTURES_PATH: /app/fixtures.json
     # The organisers' shared data set, imported as its own event on first boot.

@@ -7896,6 +7896,18 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 10000
+                  },
+                  "maxChoices": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 200
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 }
               }
@@ -7919,15 +7931,42 @@
             "schema": {
               "type": "string"
             }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success. The body is JSON unless the route exports a file."
           },
+          "400": {
+            "description": "Validation failed. `error.details` maps field names to messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or hidden from this caller."
+          }
+        }
+      }
+    },
+    "/api/events/{eventId}/voting/verify": {
+      "post": {
+        "operationId": "post_api_events_eventId_voting_verify",
+        "tags": [
+          "voting"
+        ],
+        "summary": "POST /api/events/{eventId}/voting/verify",
+        "parameters": [
           {
-            "name": "email",
-            "in": "query",
-            "required": false,
+            "name": "eventId",
+            "in": "path",
+            "required": true,
             "schema": {
-              "type": "string",
-              "format": "email",
-              "maxLength": 200
+              "type": "string"
             }
           }
         ],
@@ -7947,6 +7986,87 @@
           },
           "404": {
             "description": "Not found, or hidden from this caller."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "email"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{eventId}/voting/verify/confirm": {
+      "post": {
+        "operationId": "post_api_events_eventId_voting_verify_confirm",
+        "tags": [
+          "voting"
+        ],
+        "summary": "POST /api/events/{eventId}/voting/verify/confirm",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success. The body is JSON unless the route exports a file."
+          },
+          "400": {
+            "description": "Validation failed. `error.details` maps field names to messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or hidden from this caller."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 200
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "email",
+                  "code"
+                ]
+              }
+            }
           }
         }
       }
@@ -7993,11 +8113,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "email": {
-                    "type": "string",
-                    "format": "email",
-                    "maxLength": 200
-                  },
                   "entries": {
                     "type": "array",
                     "items": {

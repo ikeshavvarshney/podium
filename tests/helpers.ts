@@ -23,6 +23,7 @@ const TABLES = [
   "submission_custom_answers",
   "custom_questions",
   "submission_images",
+  "voter_verifications",
   "votes",
   "comments",
   "submissions",

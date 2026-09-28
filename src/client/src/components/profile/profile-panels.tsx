@@ -111,7 +111,7 @@ export function NotificationPrefs() {
         </div>
       ))}
       <p className="mt-2.5 text-meta leading-[1.5] text-muted">
-        Shown in the app on My events. This instance sends no email.
+        Shown in the app on My events.
       </p>
     </>
   );

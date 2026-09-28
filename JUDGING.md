@@ -321,7 +321,9 @@ by the system silently blending two different kinds of evidence.
 Two methods are supported, and they are not the same thing. **SINGLE is the default**; an organizer opts in to quadratic and must then state the budget.
 
 **SINGLE.** A voter backs a project once, for one unit of weight, costing one credit.
-The tally is a headcount. This is one person, one vote per project.
+The tally is a headcount: one person, one vote per project (approval voting). An organizer can
+cap how many projects each voter may back (`maxChoices`); a cap of 1 is one person, one vote.
+The cap locks with the method once ballots exist.
 
 **QUADRATIC.** A voter holds a credit budget, set by the organizer when they choose this method (the API refuses a switch to quadratic that does not name one), and buys weight on a project
 at a cost of `weight^2` credits:
@@ -368,8 +370,8 @@ identity it votes as.
 flowchart TD
     V["POST /events/:id/votes"] --> M{"access mode"}
     M -- "AUTHENTICATED" --> K1["voterKey = user:&lt;id&gt;"]
-    M -- "EMAIL_GATED" --> K2["voterKey = email:&lt;lowercased address&gt;"]
-    M -- "OPEN_LINK" --> K3["voterKey = ip:&lt;hashed client address&gt;"]
+    M -- "EMAIL_GATED" --> K2["voterKey = email:&lt;address proved by a code&gt;"]
+    M -- "OPEN_LINK" --> K3["voterKey = device:&lt;browser cookie&gt;"]
     K1 --> U["upsert Vote, unique on (event, submission, voterKey)"]
     K2 --> U
     K3 --> U
@@ -379,8 +381,8 @@ flowchart TD
 | Access mode | Key | Strength |
 | --- | --- | --- |
 | `AUTHENTICATED` | `user:<id>` | Strongest. Anonymous ballots are refused. |
-| `EMAIL_GATED` | `email:<lowercased address>` | Medium. The address is not verified by an email round trip, because the platform sends no email. |
-| `OPEN_LINK` | `ip:<hashed client address>` | Weakest, on purpose. The rate limit is what bounds abuse here. |
+| `EMAIL_GATED` | `email:<lowercased address>` | Medium. The voter proves the address with a six-digit code (15 minutes, five tries, five codes per address per 15 minutes) and gets a voter token. Codes go by SMTP when `SMTP_URL` is set, otherwise to the API log. Knowing an address no longer reveals how it voted. |
+| `OPEN_LINK` | `device:<random browser cookie>` | Weakest, on purpose. One ballot per browser, so a venue on one network does not share a ballot; clearing cookies makes a new voter, which the per-address cap on new voters per hour (`maxVotesPerIpPerHour`) and the shared-address flags bound. |
 
 Uniqueness is a database constraint, `@@unique([eventId, submissionId, voterKey])`, not
 an application-level check. Re-voting replaces the voter's whole ballot inside one
@@ -409,7 +411,7 @@ absence.
 
 ### What this does not do
 
-Email-gated voting does not prove control of the address. Open-link voting is trivially
-defeated by anyone with several addresses. Neither mode is a defence against a determined
-attacker, and the honest recommendation for anything that decides a prize is
-`AUTHENTICATED`.
+Email-gated voting proves control of an address, not that one person holds one address.
+Open-link voting is defeated by anyone with several browsers and addresses, bounded only by the
+per-address cap. Neither is a defence against a determined attacker, and the honest
+recommendation for anything that decides a prize is `AUTHENTICATED`.
