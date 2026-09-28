@@ -40,13 +40,16 @@ services:
       NODE_ENV: production
       PORT: 4000
       DATABASE_URL: postgresql://${POSTGRES_USER:-podium}:${POSTGRES_PASSWORD:-podium}@db:5432/${POSTGRES_DB:-podium}?schema=public
-      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-in-production-0123456789abcdef}
+      # Unset, the API generates its secrets on first boot and keeps them in the database.
+      JWT_SECRET: ${JWT_SECRET:-}
+      RECORD_SIGNING_SECRET: ${RECORD_SIGNING_SECRET:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
       # The API port is published directly, so X-Forwarded-For is not trusted by default.
       TRUST_PROXY: ${TRUST_PROXY:-false}
       SEED_ON_BOOT: ${SEED_ON_BOOT:-true}
+      FIXTURE_TOKENS: ${FIXTURE_TOKENS:-true}
       FIXTURES_PATH: /app/fixtures.json
     # The organisers' shared data set, imported as its own event on first boot.
     volumes:

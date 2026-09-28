@@ -822,6 +822,160 @@
         }
       }
     },
+    "/api/auth/tokens": {
+      "get": {
+        "operationId": "get_api_auth_tokens",
+        "tags": [
+          "auth"
+        ],
+        "summary": "GET /api/auth/tokens",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success. The body is JSON unless the route exports a file."
+          },
+          "400": {
+            "description": "Validation failed. `error.details` maps field names to messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in."
+          },
+          "403": {
+            "description": "Signed in but not permitted."
+          },
+          "404": {
+            "description": "Not found, or hidden from this caller."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "post_api_auth_tokens",
+        "tags": [
+          "auth"
+        ],
+        "summary": "POST /api/auth/tokens",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success. The body is JSON unless the route exports a file."
+          },
+          "400": {
+            "description": "Validation failed. `error.details` maps field names to messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in."
+          },
+          "403": {
+            "description": "Signed in but not permitted."
+          },
+          "404": {
+            "description": "Not found, or hidden from this caller."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "event": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "expiresInDays": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 365
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/tokens/{tokenId}": {
+      "delete": {
+        "operationId": "delete_api_auth_tokens_tokenId",
+        "tags": [
+          "auth"
+        ],
+        "summary": "DELETE /api/auth/tokens/{tokenId}",
+        "parameters": [
+          {
+            "name": "tokenId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success. The body is JSON unless the route exports a file."
+          },
+          "400": {
+            "description": "Validation failed. `error.details` maps field names to messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in."
+          },
+          "403": {
+            "description": "Signed in but not permitted."
+          },
+          "404": {
+            "description": "Not found, or hidden from this caller."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
     "/api/events": {
       "get": {
         "operationId": "get_api_events",
@@ -7208,6 +7362,8 @@
                       "type": "string",
                       "enum": [
                         "*",
+                        "API_TOKEN_CREATED",
+                        "API_TOKEN_REVOKED",
                         "EVENT_CREATED",
                         "EVENT_UPDATED",
                         "EVENT_STATUS_CHANGED",
@@ -7268,7 +7424,7 @@
                       ]
                     },
                     "minItems": 1,
-                    "maxItems": 58
+                    "maxItems": 60
                   }
                 },
                 "required": [
@@ -7353,6 +7509,8 @@
                       "type": "string",
                       "enum": [
                         "*",
+                        "API_TOKEN_CREATED",
+                        "API_TOKEN_REVOKED",
                         "EVENT_CREATED",
                         "EVENT_UPDATED",
                         "EVENT_STATUS_CHANGED",
@@ -7413,7 +7571,7 @@
                       ]
                     },
                     "minItems": 1,
-                    "maxItems": 58
+                    "maxItems": 60
                   },
                   "active": {
                     "type": "boolean"
@@ -9611,6 +9769,10 @@
                 "properties": {
                   "publish": {
                     "type": "boolean"
+                  },
+                  "runId": {
+                    "type": "string",
+                    "format": "uuid"
                   }
                 },
                 "required": [

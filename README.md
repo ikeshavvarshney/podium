@@ -37,17 +37,19 @@ logged: the duplicate submission `prj_41` is refused (with its 4 ballots), three
 names get the fixture id appended, and missing ballots are left missing. See
 [DATA-MODEL.md](DATA-MODEL.md#import-and-export).
 
-The checker never signs in, so the seed prints fixed `Authorization: Bearer` headers for four
-fixture accounts (`organizer@example.org`, judges `marek.nowak@example.org` and
-`mira.kaur@example.org`, participant `priya1@example.org`). They are already in
-`.dogfood.toml`, along with the routes, all on the API at port 4000:
+The checker never signs in, so the seed issues fixed API tokens for four fixture accounts
+(`organizer@example.org`, judges `marek.nowak@example.org` and `mira.kaur@example.org`,
+participant `priya1@example.org`). They are already in `.dogfood.toml`, along with the routes,
+all on the API at port 4000:
 
 ```bash
 docker compose up -d
 python3 run.py .dogfood.toml
 ```
 
-The tokens only work with the default dev `JWT_SECRET`; see [docs/SECURITY.md](docs/SECURITY.md).
+The tokens are public, so each only works inside the fixture event and never with organizer
+capability; `FIXTURE_TOKENS=false` skips them. Session and record-signing secrets are generated on
+first boot, never taken from the repository; see [docs/SECURITY.md](docs/SECURITY.md).
 The checker has no T3 or T4 probes, so a T3 claim always prints as "claimed but not verified".
 
 ### Demo accounts

@@ -6,16 +6,11 @@ import {
   verify as verifyBytes,
   type KeyObject,
 } from "node:crypto";
-import { config } from "../config.js";
+import { recordSigningSecret } from "./instance-secrets.js";
 
 /**
- * Instance signing key for publicly verifiable records.
- *
- * The key is derived deterministically from the instance secret, so a
- * self-hosted deployment gets a stable identity across restarts without a key
- * management service, and nothing has to be mounted or fetched at runtime.
- * Rotating JWT_SECRET rotates this key too, which invalidates old signatures:
- * that is the documented trade for having no extra secret to manage.
+ * Ed25519 key for publicly verifiable records, derived from the instance's record-signing secret.
+ * It is independent of the session secret, so rotating sessions never breaks issued records.
  */
 
 /** PKCS#8 prefix for a raw Ed25519 seed. */
@@ -27,7 +22,7 @@ function keys() {
   if (cached) return cached;
 
   const seed = Buffer.from(
-    hkdfSync("sha256", config.JWT_SECRET, "podium-signing-salt", "podium-record-signing", 32),
+    hkdfSync("sha256", recordSigningSecret(), "podium-signing-salt", "podium-record-signing", 32),
   );
   const privateKey = createPrivateKey({
     key: Buffer.concat([PKCS8_ED25519_PREFIX, seed]),

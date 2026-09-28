@@ -190,9 +190,12 @@ always follows a request both parties agreed to, never a unilateral write.
 A judge who wants proof of what they evaluated, without exposing anyone else's scores,
 gets a small signed document rather than a certificate image.
 
-- Keys are **derived, not stored**. `lib/signing.ts` runs `JWT_SECRET` through HKDF to
-  produce an Ed25519 keypair at boot. There is no separate signing secret to provision or
-  rotate out of band, and losing the signing key is the same event as losing `JWT_SECRET`.
+- The key is **derived from a dedicated record-signing secret**. On first boot the API
+  generates two random secrets, one for sessions and one for records, and stores them in
+  `instance_secrets` (`lib/instance-secrets.ts`); `JWT_SECRET` and `RECORD_SIGNING_SECRET`
+  override them. `lib/signing.ts` runs the record secret through HKDF into an Ed25519 keypair,
+  so rotating sessions never invalidates an issued record, and no instance ever signs with a
+  secret that is published in the repository. Production refuses to boot on the old dev default.
 - The payload is canonicalized (stable key order, no floating point) before signing, so
   the same facts always produce the same signature and a third party can recompute it.
 - `GET /records/verify` exposes the public key and re-runs the check, so a record is
@@ -202,7 +205,7 @@ gets a small signed document rather than a certificate image.
 sequenceDiagram
     participant J as Judge
     participant API as Express API
-    participant K as HKDF(JWT_SECRET)
+    participant K as HKDF(record-signing secret)
     participant V as Anyone with the record
 
     J->>API: GET /events/:id/judge/record

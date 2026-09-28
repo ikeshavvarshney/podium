@@ -3,9 +3,11 @@ import { z } from "zod";
 import { AUTH_COOKIE, config } from "../config.js";
 import { prisma } from "../db.js";
 import { asyncHandler } from "../lib/async-handler.js";
+import { forbidden } from "../lib/errors.js";
 import { currentUser, requireAuth } from "../middleware/auth.js";
 import { authRateLimit } from "../middleware/rate-limit.js";
 import { validate } from "../middleware/validate.js";
+import { createApiToken, listApiTokens, revokeApiToken } from "../services/api-token.service.js";
 import { AuditAction, recordAuditSafe } from "../services/audit.service.js";
 import {
   changePassword,
@@ -274,6 +276,41 @@ router.patch(
     const next = { ...(current.notificationPrefs as object), ...req.body };
     await prisma.user.update({ where: { id }, data: { notificationPrefs: next } });
     res.json({ judgingReminders: true, resultsPublished: true, voteDigest: false, ...next });
+  }),
+);
+
+router.get(
+  "/tokens",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    res.json(await listApiTokens(currentUser(req).id));
+  }),
+);
+
+router.post(
+  "/tokens",
+  requireAuth,
+  validate({
+    body: z.object({
+      name: z.string().trim().min(1).max(80),
+      event: z.string().trim().min(1).max(120).optional(),
+      expiresInDays: z.number().int().min(1).max(365).optional(),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    if (req.apiToken) throw forbidden("Sign in to create API tokens; a token cannot mint another.");
+    const { token, record } = await createApiToken(currentUser(req).id, req.body, req.ipHash);
+    res.status(201).json({ ...record, token });
+  }),
+);
+
+router.delete(
+  "/tokens/:tokenId",
+  requireAuth,
+  validate({ params: z.object({ tokenId: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    await revokeApiToken(currentUser(req).id, req.params.tokenId as string, req.ipHash);
+    res.status(204).end();
   }),
 );
 

@@ -58,6 +58,7 @@ model User {
   updatesAuthored EventUpdate[]     @relation("UpdateAuthor")
   signInTokens    SignInToken[]
   sessions        Session[]
+  apiTokens       ApiToken[]
   /// Notification preferences, keyed by kind. Read by the in-app notices.
   notificationPrefs Json @default("{}") @map("notification_prefs")
   pairwiseRankings PairwiseRanking[] @relation("PairwiseJudge")
@@ -101,6 +102,37 @@ model SignInToken {
 
   @@index([userId, createdAt])
   @@map("sign_in_tokens")
+}
+
+/// A bearer token for scripts and integrations. Only the hash is stored. A token scoped to an
+/// event acts as its owner inside that event only, and as nobody anywhere else.
+model ApiToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  eventId    String?   @map("event_id") @db.Uuid
+  name       String
+  tokenHash  String    @unique @map("token_hash")
+  /// First characters of the token, so an owner can tell tokens apart.
+  prefix     String
+  expiresAt  DateTime? @map("expires_at")
+  lastUsedAt DateTime? @map("last_used_at")
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("api_tokens")
+}
+
+/// Secrets generated on first boot, so no instance runs on a default from the repository.
+model InstanceSecret {
+  name      String   @id
+  value     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("instance_secrets")
 }
 
 // ============================================================
@@ -192,6 +224,7 @@ model Event {
   scores            JudgeScore[]
   normalizationRuns NormalizationRun[]
   publishedRun      NormalizationRun? @relation("PublishedRun", fields: [publishedRunId], references: [id], onDelete: SetNull)
+  apiTokens         ApiToken[]
   pairwiseRankings  PairwiseRanking[]
   webhooks          Webhook[]
   seekerListings    SeekerListing[]

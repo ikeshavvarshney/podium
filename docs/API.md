@@ -70,6 +70,8 @@ flowchart LR
 | POST | `/auth/sessions/revoke` | Revoke every session but the current one. |
 | GET | `/auth/me/activity` | The caller's own audit trail. |
 | GET / PATCH | `/auth/me/notifications` | In-app notification preferences. |
+| GET / POST | `/auth/tokens` | List or create the caller's API tokens (`pod_...`, shown once). `event` limits one to a single event, where it acts as the caller and nowhere else. A token cannot create another. |
+| DELETE | `/auth/tokens/:tokenId` | Revoke one of the caller's tokens. Audited. |
 
 ### `/events` and `/events/:eventId/...`
 
@@ -125,7 +127,7 @@ flowchart LR
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| GET | `/records/key` | The instance's public signing key, derived from `JWT_SECRET`. |
+| GET | `/records/key` | The instance's public signing key, derived from the record-signing secret. |
 | POST | `/records/verify` | Recomputes a signature over a supplied payload; verification does not require trusting the platform's own badge. |
 
 ## A cross-event authorization failure, end to end

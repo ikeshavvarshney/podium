@@ -13,6 +13,19 @@ interface Session {
   current: boolean;
 }
 
+const FIELD =
+  "bg-surface border border-line-strong rounded-[10px] px-3 py-[9px] text-ui text-text outline-none focus:border-muted";
+
+interface ApiTokenRow {
+  id: string;
+  name: string;
+  prefix: string;
+  event: { slug: string; name: string } | null;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+  expiresAt: string | null;
+}
+
 interface Activity {
   id: string;
   summary: string;
@@ -100,6 +113,103 @@ export function NotificationPrefs() {
       <p className="mt-2.5 text-meta leading-[1.5] text-muted">
         Shown in the app on My events. This instance sends no email.
       </p>
+    </>
+  );
+}
+
+/** Personal API tokens for scripts. The secret is shown once, at creation. */
+function ApiTokens({ events }: { events: MyEventRow[] }) {
+  const [tokens, setTokens] = useState<ApiTokenRow[]>([]);
+  const [name, setName] = useState("");
+  const [scope, setScope] = useState("");
+  const [fresh, setFresh] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  const load = useCallback(() => get<ApiTokenRow[]>("/auth/tokens").then(setTokens).catch(() => setTokens([])), []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function create() {
+    setError("");
+    try {
+      const res = await post<{ token: string }>("/auth/tokens", { name: name.trim(), ...(scope ? { event: scope } : {}) });
+      setFresh(res.token);
+      setName("");
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "The token could not be created.");
+    }
+  }
+
+  async function revoke(id: string) {
+    await del(`/auth/tokens/${id}`).catch(() => undefined);
+    await load();
+  }
+
+  return (
+    <>
+      <div className="eyebrow mt-[clamp(30px,5vw,42px)] tracking-label">API tokens</div>
+      <p className="mt-2 text-small leading-[1.5] text-muted">
+        For scripts and integrations: send <code className="font-mono">Authorization: Bearer pod_...</code>. A token limited to
+        one event acts as you there and nowhere else. See /api/openapi.json for every route.
+      </p>
+      <form
+        className="mt-3 flex flex-wrap gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (name.trim()) void create();
+        }}
+      >
+        <input
+          aria-label="Token name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="What is it for?"
+          maxLength={80}
+          className={`${FIELD} min-w-0 flex-[1_1_180px]`}
+        />
+        <select aria-label="Limit to event" value={scope} onChange={(e) => setScope(e.target.value)} className={`${FIELD} flex-[0_1_200px]`}>
+          <option value="">Every event</option>
+          {events.map((row) => (
+            <option key={row.event.slug} value={row.event.slug}>
+              Only {row.event.name}
+            </option>
+          ))}
+        </select>
+        <button type="submit" disabled={!name.trim()} className="btn btn-sm disabled:opacity-60">
+          Create token
+        </button>
+      </form>
+      {error ? <p className="mt-2 text-small text-danger">{error}</p> : null}
+      {fresh ? (
+        <div className="mt-3 rounded-[10px] bg-warning-soft px-3.5 py-3 text-small text-warning-text">
+          Copy it now, it will not be shown again:
+          <code className="mt-1.5 block select-all break-all font-mono text-meta">{fresh}</code>
+        </div>
+      ) : null}
+      {tokens.map((t) => (
+        <div key={t.id} className="flex items-center gap-3 border-b border-line py-[13px]">
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-ui">{t.name}</div>
+            <div className="mt-[3px] truncate font-mono text-label text-muted">
+              {[`${t.prefix}...`, t.event ? `only ${t.event.name}` : "every event", t.lastUsedAt ? ago(t.lastUsedAt) : "never used"]
+                .join(" · ")}
+            </div>
+          </div>
+          {t.revokedAt ? (
+            <span className="flex-none font-mono text-label uppercase tracking-stamp text-muted">revoked</span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void revoke(t.id)}
+              className="flex-none px-0.5 py-1 font-mono text-label uppercase tracking-stamp transition-colors hover:text-danger"
+            >
+              revoke
+            </button>
+          )}
+        </div>
+      ))}
     </>
   );
 }
@@ -274,6 +384,8 @@ export function ProfilePanels({ events }: { events: MyEventRow[] }) {
           )}
         </div>
       ))}
+
+      <ApiTokens events={events} />
 
       <div className="eyebrow mt-[clamp(30px,5vw,42px)] tracking-label">Recent activity</div>
       {activity.length === 0 ? (

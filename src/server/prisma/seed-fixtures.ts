@@ -1,11 +1,24 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { PrismaClient } from "@prisma/client";
-import { signFixedToken } from "../src/lib/jwt.js";
+import { storeApiToken } from "../src/services/api-token.service.js";
 import { fixtureSchema, importFixture, slugify, stableUserId } from "../src/services/fixture-import.service.js";
 
 /** The fixture has no organizer, so the import creates one to own the event. */
 const ORGANIZER = { email: "organizer@example.org", name: "Fixture organizer" };
+
+/**
+ * The acceptance checker's tokens, committed in .dogfood.toml. They are public by design, so each
+ * is scoped to the fixture event: inside it they act as that account, anywhere else as nobody,
+ * and never with the account's organizer capability. Revoke them with DELETE /api/auth/tokens/:id,
+ * or skip them entirely with FIXTURE_TOKENS=false.
+ */
+export const CHECKER_TOKENS: Record<string, string> = {
+  organizer: "pod_dogfood_organizer_mHUdlL3Z74StgxfAF-ULvUiv",
+  judge_a: "pod_dogfood_judgea_tYGVQuQmtrBYbXhQx9E0vKFU",
+  judge_b: "pod_dogfood_judgeb_glvLi55oj-xnR4F4kEmvatkc",
+  participant: "pod_dogfood_participant_3DXe91anyGasgaMGSdAfCBam",
+};
 
 /**
  * Who the acceptance checker acts as. Judge A and judge B are fixture judges who both hold
@@ -75,21 +88,28 @@ export async function seedFixtures(prisma: PrismaClient, passwordHash: () => Pro
     console.log(`[seed] fixture event ${slug} already present`);
   }
 
-  const issuedAt = new Date(fixture.event.submissions_close);
-  const expiresAt = new Date(issuedAt.getTime() + 3 * 365 * 24 * 60 * 60 * 1000);
-  const people = { organizer: ORGANIZER.email, ...CHECKER };
+  const people: Record<string, string> = { organizer: ORGANIZER.email, ...CHECKER };
   const users = await prisma.user.findMany({
     where: { email: { in: Object.values(people) } },
-    select: { id: true, email: true, tokenVersion: true },
+    select: { id: true, email: true },
   });
   const byEmail = new Map(users.map((u) => [u.email, u]));
+  const event = await prisma.event.findUniqueOrThrow({ where: { slug }, select: { id: true } });
 
-  console.log("[seed] acceptance checker headers (valid only with the default JWT_SECRET):");
-  for (const [role, email] of Object.entries(people)) {
-    const user = byEmail.get(email);
-    if (!user) continue;
-    const token = signFixedToken(user.id, user.tokenVersion, issuedAt, expiresAt);
-    console.log(`[seed]   ${role.padEnd(11)} = "Authorization: Bearer ${token}"`);
+  if (process.env.FIXTURE_TOKENS === "false") {
+    console.log("[seed] FIXTURE_TOKENS=false: no acceptance checker tokens issued");
+  } else {
+    console.log(`[seed] acceptance checker headers (scoped to ${slug} only):`);
+    for (const [role, email] of Object.entries(people)) {
+      const user = byEmail.get(email);
+      if (!user) continue;
+      const { token } = await storeApiToken(prisma, user.id, {
+        name: `acceptance checker (${role})`,
+        eventId: event.id,
+        plaintext: CHECKER_TOKENS[role]!,
+      });
+      console.log(`[seed]   ${role.padEnd(11)} = "Authorization: Bearer ${token}"`);
+    }
   }
   const judgeA = byEmail.get(CHECKER.judge_a);
   if (judgeA) console.log(`[seed]   peer_scores = "/api/events/${slug}/judges/${judgeA.id}/scores"`);

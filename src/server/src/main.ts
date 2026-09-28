@@ -1,7 +1,9 @@
 import { createApp } from "./app.js";
 import { config } from "./config.js";
 import { prisma } from "./db.js";
+import { initSecrets } from "./lib/instance-secrets.js";
 
+await initSecrets(prisma);
 const app = createApp();
 
 const server = app.listen(config.PORT, () => {

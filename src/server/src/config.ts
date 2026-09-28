@@ -3,17 +3,23 @@ import { loadDotEnv } from "./lib/dotenv.js";
 
 loadDotEnv();
 
+const optionalSecret = (name: string) =>
+  z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim() ? v.trim() : undefined))
+    .refine((v) => v === undefined || v.length >= 32, `${name} must be at least 32 characters`);
+
 /**
- * Environment is validated once, at boot. A missing or weak secret fails the
- * process rather than silently degrading security.
+ * Environment is validated once, at boot. Secrets are optional: unset, the instance generates
+ * and stores its own on first boot (lib/instance-secrets.ts). A weak one fails the process.
  */
 const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(4000),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
-  JWT_SECRET: z
-    .string()
-    .min(32, "JWT_SECRET must be at least 32 characters"),
+  JWT_SECRET: optionalSecret("JWT_SECRET"),
+  RECORD_SIGNING_SECRET: optionalSecret("RECORD_SIGNING_SECRET"),
   JWT_EXPIRES_IN: z.string().default("7d"),
   COOKIE_SECURE: z
     .enum(["true", "false"])

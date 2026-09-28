@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { signFixedToken } from "../../src/server/src/lib/jwt.js";
+import { CHECKER_TOKENS } from "../../src/server/prisma/seed-fixtures.js";
+import { storeApiToken } from "../../src/server/src/services/api-token.service.js";
 import {
   fixtureSchema,
   importFixture,
@@ -19,8 +20,8 @@ const fixture: Fixture = fixtureSchema.parse(
   JSON.parse(readFileSync(fileURLToPath(new URL("../../fixtures.json", import.meta.url)), "utf8")),
 );
 
-const header = (userId: string) =>
-  `Bearer ${signFixedToken(userId, 0, new Date("2026-03-01T18:00:00Z"), new Date("2029-03-01T18:00:00Z"))}`;
+const tokenByUser = new Map<string, string>();
+const header = (userId: string) => `Bearer ${tokenByUser.get(userId)}`;
 const get = (url: string, userId?: string) => {
   const r = request(app).get(url);
   return userId ? r.set("Authorization", header(userId)) : r;
@@ -39,6 +40,16 @@ describe("fixtures.json import and the acceptance checker probes", () => {
     organizerId = organizer.id;
     const result = await importFixture(prisma, fixture, { ownerId: organizer.id, passwordHash: "x" });
     slug = result.slug;
+    const roles: Array<[string, string]> = [
+      ["organizer", organizer.id],
+      ["judge_a", judgeA],
+      ["judge_b", judgeB],
+      ["participant", participant],
+    ];
+    for (const [role, userId] of roles) {
+      await storeApiToken(prisma, userId, { name: role, eventId: result.eventId, plaintext: CHECKER_TOKENS[role]! });
+      tokenByUser.set(userId, CHECKER_TOKENS[role]!);
+    }
   });
 
   afterAll(async () => {

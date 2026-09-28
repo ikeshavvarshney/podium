@@ -1,9 +1,11 @@
 import type { NextFunction, Request, Response } from "express";
-import { AUTH_COOKIE, config } from "../config.js";
+import { AUTH_COOKIE } from "../config.js";
 import { prisma } from "../db.js";
 import { hashWithSalt } from "../lib/crypto.js";
+import { sessionSecret } from "../lib/instance-secrets.js";
 import { unauthorized } from "../lib/errors.js";
 import { verifyToken } from "../lib/jwt.js";
+import { isApiToken, resolveApiToken } from "../services/api-token.service.js";
 
 export interface AuthUser {
   id: string;
@@ -20,6 +22,8 @@ declare global {
       ipHash?: string;
       /** The device session the caller's token belongs to, if any. */
       sessionId?: string;
+      /** Set when the caller authenticated with an API token rather than a session. */
+      apiToken?: boolean;
     }
   }
 }
@@ -38,7 +42,16 @@ function readToken(req: Request): string | null {
 
 export function clientIpHash(req: Request): string {
   const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
-  return hashWithSalt(ip, config.JWT_SECRET);
+  return hashWithSalt(ip, sessionSecret());
+}
+
+/** An event-scoped token authenticates only under /api/events/<its event>. */
+function pathIsInEvent(url: string, scope: { eventId: string; slug: string }): boolean {
+  const path = url.split("?")[0]!;
+  return [scope.eventId, scope.slug].some((id) => {
+    const base = `/api/events/${id}`;
+    return path === base || path.startsWith(`${base}/`);
+  });
 }
 
 /**
@@ -50,6 +63,15 @@ export async function attachUser(req: Request, _res: Response, next: NextFunctio
   req.ipHash = clientIpHash(req);
   const token = readToken(req);
   if (!token) return next();
+
+  if (isApiToken(token)) {
+    const resolved = await resolveApiToken(token);
+    if (!resolved) return next();
+    if (resolved.scope && !pathIsInEvent(req.originalUrl, resolved.scope)) return next();
+    req.user = resolved.user;
+    req.apiToken = true;
+    return next();
+  }
 
   const payload = verifyToken(token);
   if (!payload) return next();

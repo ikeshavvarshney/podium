@@ -209,9 +209,12 @@ than claim coverage the code does not have.
   the action that triggered it, by design, but that also means delivery is not
   guaranteed; `WebhookDelivery` records every attempt so a gap is diagnosable, not silent.
 - **The acceptance checker tokens in `.dogfood.toml` are public.** The checker never signs in,
-  so the seed issues fixed tokens for four fixture accounts. They are signed with the dev
-  default `JWT_SECRET` from `docker-compose.yml`; any deployment that sets its own secret (as
-  it must) invalidates them, and bumping an account's token version revokes one.
+  so the seed stores four fixed API tokens for fixture accounts. Each is scoped to the fixture
+  event: inside `sample-hack-2026` it acts as its account, anywhere else it authenticates as
+  nobody, and it never carries the account's organizer capability, so it cannot create events.
+  `FIXTURE_TOKENS=false` skips them and `DELETE /api/auth/tokens/:id` revokes one. Session and
+  record-signing secrets are generated per instance on first boot, so knowing the repository
+  does not let anyone forge a session.
 - **No anomaly detection.** Flagged voting activity (shared IP across voter keys) is
   surfaced to the organizer for a human decision; nothing is auto-blocked, so a patient
   attacker below the flagging threshold is not caught by the platform itself.

@@ -11,14 +11,14 @@ claimed = ["T1", "T2", "T3", "T4"]
 pitch = "A self-hostable, API-first hackathon platform with event-scoped roles, weighted rubrics, documented cross-judge normalization and judge isolation enforced in the backend."
 
 [auth]
-# Printed by the seed at boot. Fixed tokens for fixture accounts, valid only with the default
-# JWT_SECRET in docker-compose.yml; a deployment that sets its own secret invalidates them.
+# API tokens issued by the seed, scoped to the fixture event: inside sample-hack-2026 they act as
+# the account, anywhere else as nobody. Public by design; FIXTURE_TOKENS=false skips them.
 # organizer = organizer@example.org, judge_a = marek.nowak (jdg_08), judge_b = mira.kaur (jdg_19),
 # participant = priya1@example.org (team NorthKiln).
-organizer   = "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMTYyY2UxNy03OTg0LTQ5OTktOGRmNC05MDljOTdhNzZhMWYiLCJ0diI6MCwiaWF0IjoxNzcyMzg4MDAwLCJleHAiOjE4NjY5OTYwMDAsImlzcyI6InBvZGl1bSJ9.xujQj9fBcmeVPD_vH0UhnURNQ84SqEJWRIowmYAkO90"
-judge_a     = "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMjZmNWU2NS0yZDVjLTQzMWItOTM2Ni1jYjg0OTJmMmY2YWIiLCJ0diI6MCwiaWF0IjoxNzcyMzg4MDAwLCJleHAiOjE4NjY5OTYwMDAsImlzcyI6InBvZGl1bSJ9.SglwOB2qfHY-pXHUHGm_n4JA6eIS9xJVzGm7CAxyWFg"
-judge_b     = "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiMTViYTcwMi04MzdlLTQ3MDktYmUzOS05MDI1ZTU1MzUxMTUiLCJ0diI6MCwiaWF0IjoxNzcyMzg4MDAwLCJleHAiOjE4NjY5OTYwMDAsImlzcyI6InBvZGl1bSJ9.ifuDTReP6-EGBN8a9ZmQXq94_YjVP8_KWpHqYSZELC0"
-participant = "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4MzhhMzU5YS01YjgzLTRkNTUtODlmNS1lMTIzMmRiNGJlYTEiLCJ0diI6MCwiaWF0IjoxNzcyMzg4MDAwLCJleHAiOjE4NjY5OTYwMDAsImlzcyI6InBvZGl1bSJ9.fZ9Z74i0e6X3XYtdnprqYSJOHUu6X47v66HNqMVuHhk"
+organizer   = "Authorization: Bearer pod_dogfood_organizer_mHUdlL3Z74StgxfAF-ULvUiv"
+judge_a     = "Authorization: Bearer pod_dogfood_judgea_tYGVQuQmtrBYbXhQx9E0vKFU"
+judge_b     = "Authorization: Bearer pod_dogfood_judgeb_glvLi55oj-xnR4F4kEmvatkc"
+participant = "Authorization: Bearer pod_dogfood_participant_3DXe91anyGasgaMGSdAfCBam"
 
 [routes]
 # The fixture event is imported from fixtures.json as "sample-hack-2026".
