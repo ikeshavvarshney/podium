@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ScreenSkeleton } from "@/components/layout/screen-skeleton";
 import { PreviewImage } from "@/components/submission/preview-image";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ApiError, get, patch, post } from "@/lib/api";
+import { ApiError, get, patch, post, uploadImage } from "@/lib/api";
 import { coverHue, hue, initials } from "@/lib/hues";
 import { formatDeadline, timeLeft } from "@/lib/participant-step";
 import type {
@@ -121,6 +121,7 @@ export default function SubmitPage() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [gallery, setGallery] = useState<string[]>([]);
   const [imageInput, setImageInput] = useState("");
+  const [uploading, setUploading] = useState<"thumbnail" | "gallery" | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [inviteUrl, setInviteUrl] = useState("");
   const [copied, setCopied] = useState(false);
@@ -267,6 +268,26 @@ export default function SubmitPage() {
     if (!url) return { list: gallery, invalid: false };
     if (!isHttpUrl(url)) return { list: gallery, invalid: true };
     return { list: Array.from(new Set([...gallery, url])).slice(0, MAX_IMAGES), invalid: false };
+  }
+
+  async function uploadTo(target: "thumbnail" | "gallery", file: File | undefined) {
+    if (!file) return;
+    const key = target === "thumbnail" ? "thumbnailUrl" : "images";
+    if (file.size > 2 * 1024 * 1024) {
+      setErrors((e) => ({ ...e, [key]: "Images can be up to 2 MB." }));
+      return;
+    }
+    setUploading(target);
+    setErrors((e) => ({ ...e, [key]: "" }));
+    try {
+      const { url } = await uploadImage(file, slug);
+      if (target === "thumbnail") set("thumbnailUrl", url);
+      else setImages(Array.from(new Set([...gallery, url])).slice(0, MAX_IMAGES));
+    } catch (err) {
+      setErrors((e) => ({ ...e, [key]: err instanceof ApiError ? err.message : "That image could not be uploaded." }));
+    } finally {
+      setUploading(null);
+    }
   }
 
   function addImage() {
@@ -838,9 +859,22 @@ export default function SubmitPage() {
               onBlur={() => tidyUrl("thumbnailUrl")}
               disabled={locked}
               error={errors.thumbnailUrl}
-              help="A link to an image. This instance does not host uploads."
+              help="A link to an image, or upload one below (PNG, JPEG, GIF or WebP, up to 2 MB)."
               placeholder="https://.../cover.png"
             />
+            <label className={`btn btn-sm mt-2 inline-flex w-fit ${locked || uploading ? "pointer-events-none opacity-40" : "cursor-pointer"}`}>
+              {uploading === "thumbnail" ? "Uploading..." : "Upload thumbnail"}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                className="sr-only"
+                disabled={locked || uploading !== null}
+                onChange={(e) => {
+                  void uploadTo("thumbnail", e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
+            </label>
 
             <h3 className="eyebrow mt-[clamp(28px,4vw,38px)]">Licence</h3>
             <div role="group" aria-label="Licence" className="mt-3 flex flex-wrap gap-1.5">
@@ -868,8 +902,8 @@ export default function SubmitPage() {
 
             <h3 className="eyebrow mt-[clamp(28px,4vw,38px)]">Gallery images</h3>
             <p className="mt-2 text-small text-muted">
-              Images are referenced by link: the platform stores no uploads, which keeps a self-hosted
-              deployment free of object storage. The thumbnail above is the first image; add up to{" "}
+              Upload images or paste links. Uploads are kept in the event&apos;s own database, so a self-hosted
+              deployment needs no object storage. The thumbnail above is the first image; add up to{" "}
               {MAX_IMAGES} more here.
             </p>
             {draft.thumbnailUrl.trim() || gallery.length > 0 ? (
@@ -932,6 +966,21 @@ export default function SubmitPage() {
               >
                 Add image
               </button>
+              <label
+                className={`btn inline-flex ${locked || uploading || gallery.length >= MAX_IMAGES ? "pointer-events-none opacity-40" : "cursor-pointer"}`}
+              >
+                {uploading === "gallery" ? "Uploading..." : "Upload"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  className="sr-only"
+                  disabled={locked || uploading !== null || gallery.length >= MAX_IMAGES}
+                  onChange={(e) => {
+                    void uploadTo("gallery", e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
             </div>
             {errors.images ? (
               <p id="images-error" className="mt-1.5 text-small text-danger">

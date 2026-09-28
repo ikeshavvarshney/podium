@@ -53,3 +53,11 @@ export const put = <T>(path: string, data: unknown) =>
 export const patch = <T>(path: string, data: unknown) =>
   api<T>(path, { method: "PATCH", body: JSON.stringify(data) });
 export const del = <T>(path: string) => api<T>(path, { method: "DELETE" });
+
+/** Uploads one image file and returns the link to store on a submission. */
+export const uploadImage = (file: File, event?: string) =>
+  api<{ id: string; url: string }>(`/uploads${event ? `?event=${encodeURIComponent(event)}` : ""}`, {
+    method: "POST",
+    body: file,
+    headers: { "Content-Type": "application/octet-stream" },
+  });

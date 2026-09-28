@@ -1,3 +1,4 @@
+import uploadRoutes from "./routes/upload.routes.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, { type Express, Router } from "express";
@@ -49,6 +50,7 @@ export function createApp(): Express {
   api.use("/invites", inviteRoutes);
   api.use("/organizer", organizerRoutes);
   api.use("/records", recordRoutes);
+  api.use("/uploads", uploadRoutes);
 
   let spec: ReturnType<typeof buildOpenApi> | null = null;
   api.get("/openapi.json", (_req, res) => {

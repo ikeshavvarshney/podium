@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
+import { config } from "../config.js";
 import { prisma } from "../db.js";
 import { hashPassword, randomToken } from "../lib/crypto.js";
 import { badRequest, conflict } from "../lib/errors.js";
@@ -41,6 +42,7 @@ const MODELS: ModelSpec[] = [
   { model: "TeamMember", scope: { via: "team" } },
   { model: "SeekerListing", scope: { eventId: "" } },
   { model: "JoinRequest", scope: { eventId: "" } },
+  { model: "Upload", scope: { eventId: "" } },
   { model: "Submission", scope: { eventId: "" } },
   { model: "SubmissionImage", scope: { via: "submission" } },
   { model: "CustomAnswer", scope: { via: "submission" } },
@@ -80,6 +82,8 @@ function foreignKeys(name: string): Map<string, string> {
   return keys;
 }
 
+const bytesFields = (name: string) => new Set(modelMeta(name).fields.filter((f) => f.type === "Bytes").map((f) => f.name));
+
 const jsonFields = (name: string) => new Set(modelMeta(name).fields.filter((f) => f.type === "Json").map((f) => f.name));
 
 export interface EventTransfer {
@@ -104,7 +108,10 @@ export async function exportEvent(eventId: string): Promise<EventTransfer> {
       for (const key of userKeys) if (typeof row[key] === "string") userIds.add(row[key] as string);
       if (typeof row.voterKey === "string" && row.voterKey.startsWith("user:")) userIds.add(row.voterKey.slice(5));
     }
-    tables[spec.model] = rows;
+    const bytes = bytesFields(spec.model);
+    tables[spec.model] = bytes.size
+      ? rows.map((row) => Object.fromEntries(Object.entries(row).map(([k, v]) => [k, bytes.has(k) ? { base64: Buffer.from(v as Uint8Array).toString("base64") } : v])))
+      : rows;
   }
 
   const people = await prisma.user.findMany({
@@ -122,10 +129,14 @@ export async function exportEvent(eventId: string): Promise<EventTransfer> {
   };
 }
 
-/** Replaces every old id found in a string, a list or nested JSON. */
+const UPLOAD_URL = /^.*\/api\/uploads\/([0-9a-f-]{36})$/i;
+
+/** Replaces every old id found in a string, a list or nested JSON. Upload links move to this instance. */
 function remapDeep(value: unknown, ids: Map<string, string>): unknown {
   if (typeof value === "string") {
     if (ids.has(value)) return ids.get(value);
+    const upload = UPLOAD_URL.exec(value);
+    if (upload && ids.has(upload[1]!)) return `${config.PUBLIC_API_URL.replace(/\/$/, "")}/api/uploads/${ids.get(upload[1]!)}`;
     if (value.startsWith("user:") && ids.has(value.slice(5))) return `user:${ids.get(value.slice(5))}`;
     return value;
   }
@@ -198,11 +209,16 @@ export async function importEvent(
         const rows = data.tables[spec.model] ?? [];
         if (rows.length === 0) continue;
         const json = jsonFields(spec.model);
+        const bytes = bytesFields(spec.model);
         const generated = new Set(GENERATED[spec.model] ?? []);
         const prepared = rows.map((row) => {
           const out: Row = {};
           for (const [key, value] of Object.entries(row)) {
             if (generated.has(key)) continue;
+            if (bytes.has(key)) {
+              out[key] = new Uint8Array(Buffer.from((value as { base64: string }).base64, "base64"));
+              continue;
+            }
             const mapped = remapDeep(value, ids);
             out[key] = json.has(key) && mapped === null ? Prisma.DbNull : mapped;
           }

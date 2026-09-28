@@ -101,14 +101,14 @@ port 5433.
 The suite refuses to run unless `DATABASE_URL` points at a database whose name ends in
 `_test`, so a test run cannot truncate development data.
 
-Current coverage: 412 tests across 34 files, unit and integration: authentication
+Current coverage: 417 tests across 35 files, unit and integration: authentication
 (password and passwordless), device sessions, scoped API tokens and instance secrets,
 event-scoped RBAC, cross-event isolation, role grants and revocation, private-event visibility,
 team formation and the team board, invite-link handling, submission lifecycle, gallery search and
 filter, server-side deadline enforcement, rubric and comparative (Bradley-Terry) judging, ballot
 freezing and pinned publication, normalization with shrinkage, panel integrity checks, voting
 (email codes, per-device open links, choice limits), webhooks (outbox, retries, SSRF guard), the
-hash-chained audit log, signed judge records, certificates, bulk import, whole-event export and
+hash-chained audit log, image uploads, signed judge records, certificates, bulk import, whole-event export and
 import, request hardening and sign-in limits, and the fixtures.json import replayed against the
 seven acceptance checker probes.
 
@@ -200,8 +200,9 @@ Claimed honestly in `.dogfood.toml`: T1, T2, T3 and T4. The acceptance checker o
 - Webhook retries stop after six attempts over about two and a half hours; after that a
   delivery is marked failed and waits for a manual retry.
 - Collusion checks flag lockstep judge pairs, outlier ballots and same-organization assignments, but cannot prove intent, and the gallery's read limit slows a crawler rather than stopping one spread across many addresses; see [docs/SECURITY.md](docs/SECURITY.md).
-- No file uploads. Images are referenced by URL, which keeps the deployment free of
-  object storage.
+- Uploads are images only (PNG, JPEG, GIF, WebP, 2 MB each, 50 MB per person per day) and live in
+  Postgres, which suits a hackathon's few hundred images; a much larger archive would want object
+  storage.
 - Email goes out only when `SMTP_URL` points at a mail server. Without one (the offline default)
   sign-in links and voting codes are written to the API log for the operator to relay, and team
   invite links are shown on-screen. Accounts created by a roster import sign in by link.

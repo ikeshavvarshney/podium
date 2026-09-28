@@ -39,6 +39,19 @@ export function errorHandler(
     }
   }
 
+  // body-parser: malformed JSON (400) or a body over the route's limit (413) is the client's error.
+  const parser = err as { type?: string; status?: number };
+  if (typeof parser.status === "number" && parser.status >= 400 && parser.status < 500 && parser.type) {
+    const tooLarge = parser.type === "entity.too.large";
+    res.status(parser.status).json({
+      error: {
+        code: tooLarge ? "payload_too_large" : "bad_request",
+        message: tooLarge ? "That request body is too large." : "The request body could not be read.",
+      },
+    });
+    return;
+  }
+
   console.error("[error]", err);
   res.status(500).json({
     error: {

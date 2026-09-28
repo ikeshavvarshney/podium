@@ -79,6 +79,8 @@ flowchart LR
 | --- | --- | --- |
 | GET | `/events` | Public listing, with mode/eligibility/status/theme filters. |
 | POST | `/events` | Organizer capability required. A `slug` the organizer picks is used exactly (lowercased) or refused: `400` for a bad shape or reserved word, `409` with a `suggestion` if another event has it. Without one, a unique link is derived from the name. |
+| POST | `/uploads?event=` | Signed in. The raw image as the body. PNG, JPEG, GIF or WebP by content (SVG refused), up to 2 MB, 50 MB per person per day. Returns `{ id, url }`. |
+| GET | `/uploads/:id` | Public. Served with `nosniff`, a sandboxing CSP and immutable caching. |
 | POST | `/events/import` | Organizer capability required. `{ data, slug? }` where `data` is an `export/event.json` from any podium instance. Creates a new event owned by the caller. See DATA-MODEL.md. |
 | GET | `/events/slug-availability?slug=` | Organizer capability required. `{ slug, available, reason?, suggestion? }`, for the wizard's live check. |
 | GET / PATCH | `/events/:eventId` | Private events 404 for non-members rather than 403, so their existence is not confirmed. |

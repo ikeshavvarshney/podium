@@ -10365,6 +10365,92 @@
         }
       }
     },
+    "/api/uploads": {
+      "post": {
+        "operationId": "post_api_uploads",
+        "tags": [
+          "uploads"
+        ],
+        "summary": "POST /api/uploads",
+        "parameters": [
+          {
+            "name": "event",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success. The body is JSON unless the route exports a file."
+          },
+          "400": {
+            "description": "Validation failed. `error.details` maps field names to messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in."
+          },
+          "403": {
+            "description": "Signed in but not permitted."
+          },
+          "404": {
+            "description": "Not found, or hidden from this caller."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/api/uploads/{uploadId}": {
+      "get": {
+        "operationId": "get_api_uploads_uploadId",
+        "tags": [
+          "uploads"
+        ],
+        "summary": "GET /api/uploads/{uploadId}",
+        "parameters": [
+          {
+            "name": "uploadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success. The body is JSON unless the route exports a file."
+          },
+          "400": {
+            "description": "Validation failed. `error.details` maps field names to messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or hidden from this caller."
+          }
+        }
+      }
+    },
     "/api/openapi.json": {
       "get": {
         "operationId": "get_api_openapi_json",

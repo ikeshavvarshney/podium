@@ -189,6 +189,15 @@ that backs the claim.
 - **Not addressed.** Relationships beyond a shared organization are not modelled, and on a small
   panel two coordinating judges who vary their scores just enough can stay under every threshold.
 
+### Malicious uploads
+
+*Attack:* upload a file that runs script in the platform's origin, or fill the disk.
+
+- **Stopped.** The type comes from the file's first bytes, not the client's header: only PNG, JPEG,
+  GIF and WebP are accepted, so SVG and HTML never get in. Served files carry
+  `X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src 'none'; sandbox`.
+- **Reduced.** Each file is at most 2 MB and each person 50 MB a day, behind the write limit.
+
 ### Deadline gaming
 
 *Attack:* edit after the deadline, or replay a stale page.

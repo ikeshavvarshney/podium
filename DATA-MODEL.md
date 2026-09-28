@@ -156,6 +156,7 @@ erDiagram
 
 | Table | Purpose |
 | --- | --- |
+| `uploads` | Image bytes, type and SHA-256, owned by the uploader and optionally by an event. Kept in Postgres so there is no object store to run, and so backups and event exports carry the images. |
 | `audit_logs` | Append-only by trigger, and hash-chained per event (`chain_seq`, `prev_hash`, `hash`). Carries a machine action, a readable summary, actor, event, target, metadata and a hashed IP. |
 | `webhooks` | An organizer-registered URL and secret, per event, subscribed to specific audit actions or to `*` (all of them). |
 | `webhook_outbox` | One row per notification owed to one webhook: the signed body, status (`PENDING`, `DELIVERED`, `FAILED`), attempts and the next attempt time. Its id is the delivery id receivers deduplicate on. |

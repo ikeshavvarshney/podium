@@ -27,6 +27,8 @@ const EnvSchema = z.object({
     .transform((v) => v === "true"),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
   PUBLIC_WEB_URL: z.string().default("http://localhost:3000"),
+  /** Where browsers reach the API; uploaded images are linked from here. */
+  PUBLIC_API_URL: z.string().default("http://localhost:4000"),
   /** Lets webhooks reach private and loopback addresses. For local development only. */
   WEBHOOK_ALLOW_PRIVATE: z
     .enum(["true", "false"])
