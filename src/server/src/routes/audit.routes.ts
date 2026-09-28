@@ -5,6 +5,7 @@ import { asyncHandler } from "../lib/async-handler.js";
 import { requireAuth } from "../middleware/auth.js";
 import { eventContext, loadEventContext, requireEventAdmin } from "../middleware/event-context.js";
 import { validate } from "../middleware/validate.js";
+import { verifyAuditChain } from "../services/audit.service.js";
 
 const router: Router = Router({ mergeParams: true });
 
@@ -41,10 +42,23 @@ router.get(
         metadata: true,
         ipHash: true,
         createdAt: true,
+        chainSeq: true,
+        hash: true,
         actor: { select: { id: true, name: true } },
       },
     });
     res.json(entries);
+  }),
+);
+
+/** Recomputes the event's audit hash chain and reports the first break, if any. */
+router.get(
+  "/verify",
+  requireAuth,
+  asyncHandler(loadEventContext),
+  requireEventAdmin,
+  asyncHandler(async (req, res) => {
+    res.json(await verifyAuditChain(eventContext(req).event.id));
   }),
 );
 

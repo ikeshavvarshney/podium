@@ -243,12 +243,13 @@ export async function exportAudit(ctx: EventContext): Promise<string> {
   const entries = await prisma.auditLog.findMany({
     where: { eventId: ctx.event.id },
     include: { actor: { select: { name: true, email: true } } },
-    orderBy: { createdAt: "asc" },
+    orderBy: [{ chainSeq: "asc" }, { createdAt: "asc" }],
   });
 
   return toCsv(
-    ["timestamp", "action", "actor", "actor_email", "target_type", "target_id", "summary"],
+    ["seq", "timestamp", "action", "actor", "actor_email", "target_type", "target_id", "summary", "prev_hash", "hash"],
     entries.map((e) => [
+      e.chainSeq ?? "",
       e.createdAt.toISOString(),
       e.action,
       e.actor?.name ?? "system",
@@ -256,6 +257,8 @@ export async function exportAudit(ctx: EventContext): Promise<string> {
       e.targetType ?? "",
       e.targetId ?? "",
       e.summary,
+      e.prevHash ?? "",
+      e.hash ?? "",
     ]),
   );
 }

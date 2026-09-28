@@ -134,3 +134,39 @@ export function recordAuditSafe(entry: AuditEntry, db: Db = prisma): void {
     console.error("[audit] failed to record entry", entry.action, err);
   });
 }
+
+export interface ChainVerification {
+  ok: boolean;
+  entries: number;
+  head: string | null;
+  firstBreak: { id: string; chainSeq: number | null; reason: string } | null;
+}
+
+/**
+ * Recomputes every hash in an event's chain inside the database, with the same function the
+ * insert trigger used, and checks each entry links to the one before it.
+ */
+export async function verifyAuditChain(eventId: string | null): Promise<ChainVerification> {
+  const rows = await prisma.$queryRaw<
+    Array<{ id: string; chain_seq: number | null; prev_hash: string | null; hash: string | null; recomputed: string | null }>
+  >`SELECT a."id", a."chain_seq", a."prev_hash", a."hash", audit_log_digest(a."prev_hash", a) AS recomputed
+    FROM "audit_logs" a WHERE a."event_id" IS NOT DISTINCT FROM ${eventId}::uuid
+    ORDER BY a."chain_seq" NULLS FIRST, a."created_at"`;
+
+  let prev = "genesis";
+  for (const [i, row] of rows.entries()) {
+    const reason =
+      row.chain_seq !== i + 1
+        ? "an entry is missing or out of order"
+        : row.prev_hash !== prev
+          ? "the link to the previous entry does not match"
+          : row.hash !== row.recomputed
+            ? "the entry was changed after it was written"
+            : null;
+    if (reason) {
+      return { ok: false, entries: rows.length, head: rows.at(-1)?.hash ?? null, firstBreak: { id: row.id, chainSeq: row.chain_seq, reason } };
+    }
+    prev = row.hash!;
+  }
+  return { ok: true, entries: rows.length, head: rows.at(-1)?.hash ?? null, firstBreak: null };
+}

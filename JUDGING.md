@@ -228,9 +228,11 @@ whether `curl` with a valid session for judge A can reach judge B's data. It can
 ## 7. Audit trail
 
 `SCORE_SUBMITTED`, `SCORE_UPDATED`, `JUDGE_ASSIGNED`, `JUDGE_UNASSIGNED`,
-`NORMALIZATION_RUN` and `RESULTS_PUBLISHED` are written to the append-only audit log with
-a readable summary, so an organizer can reconstruct what happened without a database
-client.
+`NORMALIZATION_RUN` and `RESULTS_PUBLISHED` are written to the audit log with a readable
+summary, so an organizer can reconstruct what happened without a database client. A changed
+ballot records its criterion values before and after. The log is hash-chained and append-only in
+the database (see [ARCHITECTURE.md](ARCHITECTURE.md#audit-log)), and the Audit screen verifies
+the chain on every visit.
 
 ## 8. Comparative mode
 

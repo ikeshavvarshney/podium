@@ -176,7 +176,7 @@ Claimed honestly in `.dogfood.toml`: T1, T2, T3 and T4. The acceptance checker o
 - Organizer-chosen event links, checked for availability as they are typed, and Markdown
   event descriptions with a live preview (raw HTML is never rendered)
 - Announcements per event with tags and per-user read receipts
-- Append-only audit log covering auth, roles, teams, submissions, judging, voting and
+- Hash-chained, database-enforced append-only audit log, verifiable from the Audit screen, covering auth, roles, teams, submissions, judging, voting and
   deadline rejections
 - Rate limiting on authentication, writes, invite acceptance and ballots
 - Bulk roster import from CSV (`email`, `name`, `team`): creates missing accounts, grants the

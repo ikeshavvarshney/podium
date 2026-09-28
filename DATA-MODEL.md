@@ -155,7 +155,7 @@ erDiagram
 
 | Table | Purpose |
 | --- | --- |
-| `audit_logs` | Append-only. Carries a machine action, a readable summary, actor, event, target and a hashed IP. |
+| `audit_logs` | Append-only by trigger, and hash-chained per event (`chain_seq`, `prev_hash`, `hash`). Carries a machine action, a readable summary, actor, event, target, metadata and a hashed IP. |
 | `webhooks` | An organizer-registered URL and secret, per event, subscribed to specific audit actions or to `*` (all of them). |
 | `webhook_deliveries` | One row per dispatch attempt: status code, truncated response body, timestamp. Delivery is fire-and-forget from `recordAudit`, so this table is the only record of what was sent and whether it landed. |
 

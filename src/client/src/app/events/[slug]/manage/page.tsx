@@ -439,9 +439,9 @@ export default function ManageEventPage() {
             <h2 id="audit-title" className="m-0 text-title font-semibold tracking-head">
               Audit log
             </h2>
-            <a href={`${apiBase()}/api/events/${slug}/export/audit.csv`} className="btn btn-sm">
-              Export CSV
-            </a>
+            <Link href={`/events/${slug}/audit`} className="btn btn-sm">
+              Full trail
+            </Link>
           </div>
           <div className="mt-3">
             {auditFailed ? (

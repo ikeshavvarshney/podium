@@ -9,7 +9,7 @@ export interface NavItem {
 /** The slice of an event the navigation needs. The server still decides what each route allows. */
 export type NavEvent = Pick<EventDetail, "slug" | "status" | "resultsPublished" | "viewer">;
 
-const ADMIN_KEYS = ["dashboard", "assign", "rounds", "voting", "results", "updates", "roles", "settings"] as const;
+const ADMIN_KEYS = ["dashboard", "assign", "rounds", "voting", "results", "updates", "roles", "audit", "settings"] as const;
 
 /**
  * The sections of one event that this viewer can reach, in working order.
@@ -31,6 +31,7 @@ export function eventNav(event: NavEvent): NavItem[] {
       results: at("results", "/results", "Results"),
       updates: at("updates", "/updates", "Updates"),
       roles: at("roles", "/roles", "Roles"),
+      audit: at("audit", "/audit", "Audit"),
       settings: at("settings", "/settings", "Settings"),
     };
     for (const key of ADMIN_KEYS) items.push(admin[key]);

@@ -132,9 +132,23 @@ Disabling the button in the browser changes nothing about what the server accept
 
 ## Audit log
 
-Append-only. Nothing in the application updates or deletes an `audit_logs` row. Each
-entry carries a machine-readable action, a human-readable one-line summary, the actor,
-the event, the target, and a hashed client IP.
+Append-only, and enforced by the database rather than by convention. Each entry carries a
+machine-readable action, a human-readable one-line summary, the actor, the event, the target,
+the metadata (a changed ballot stores its values before and after) and a hashed client IP.
+
+Two triggers from migration 0017 guard the table:
+
+- **`audit_logs_chain`** (before insert) takes a per-event advisory lock, numbers the entry
+  (`chain_seq`), and writes `prev_hash` and `hash = sha256(prev_hash | entry fields)`. It runs in
+  the database, so no insert path, including the seed's bulk writes, can skip it.
+- **`audit_logs_append_only`** (before update or delete) raises, except for the two cascades the
+  schema needs: deleting a whole event, and clearing `actor_id` when an account is deleted.
+  `actor_id` is outside the hash for that reason; the summary still names who acted.
+
+`GET /events/:id/audit/verify` recomputes the chain with the same SQL function and reports the
+first entry that was changed, removed or reordered. The audit screen shows the chain head: an
+organizer who notes it can later prove the history was not rewritten, even by someone with
+database access who disabled the triggers, because a rewrite cannot reproduce the head.
 
 The summary exists so an organizer can read the trail in the product rather than in
 `psql`. IPs are stored only as a salted hash, so the log is useful for abuse
