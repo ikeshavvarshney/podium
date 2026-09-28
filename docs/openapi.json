@@ -1308,6 +1308,69 @@
         }
       }
     },
+    "/api/events/import": {
+      "post": {
+        "operationId": "post_api_events_import",
+        "tags": [
+          "import"
+        ],
+        "summary": "POST /api/events/import",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success. The body is JSON unless the route exports a file."
+          },
+          "400": {
+            "description": "Validation failed. `error.details` maps field names to messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in."
+          },
+          "403": {
+            "description": "Signed in but not permitted."
+          },
+          "404": {
+            "description": "Not found, or hidden from this caller."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-required-role": "organizer account",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "slug": {
+                    "type": "string",
+                    "maxLength": 80
+                  }
+                },
+                "required": [
+                  "data"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/events/slug-availability": {
       "get": {
         "operationId": "get_api_events_slug_availability",

@@ -198,11 +198,11 @@ describe("CSV export", () => {
         .get(`/api/events/${event.id}/export/event.json`)
         .expect(200);
 
-      expect(res.body.formatVersion).toBe(1);
+      expect(res.body.formatVersion).toBe(2);
       expect(res.body.event.slug).toBe(event.slug);
-      expect(res.body.event.submissions).toHaveLength(1);
-      expect(res.body.event.scores).toHaveLength(1);
-      expect(res.body.event.rubric.criteria).toHaveLength(2);
+      expect(res.body.tables.Submission).toHaveLength(1);
+      expect(res.body.tables.JudgeScore).toHaveLength(1);
+      expect(res.body.tables.RubricCriterion).toHaveLength(2);
     });
 
     it("never includes a password hash in the JSON export", async () => {

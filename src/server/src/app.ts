@@ -25,7 +25,10 @@ export function createApp(): Express {
       credentials: true,
     }),
   );
-  app.use(express.json({ limit: "1mb" }));
+  // An event export can run to megabytes; everything else stays small.
+  const bigJson = express.json({ limit: "50mb" });
+  const smallJson = express.json({ limit: "1mb" });
+  app.use((req, res, next) => (req.path === "/api/events/import" ? bigJson : smallJson)(req, res, next));
   app.use(cookieParser());
   app.use(attachUser);
 

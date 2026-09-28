@@ -18,7 +18,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "openapi": "tsx scripts/openapi.ts",
-    "proof": "tsx scripts/normalization-proof.ts"
+    "proof": "tsx scripts/normalization-proof.ts",
+    "event": "tsx scripts/event-transfer.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

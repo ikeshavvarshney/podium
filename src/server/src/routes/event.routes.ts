@@ -1,3 +1,4 @@
+import { importEvent, type EventTransfer } from "../services/event-transfer.service.js";
 import { EventMode, EventStatus, EventVisibility, Experience } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
@@ -116,6 +117,23 @@ router.post(
   asyncHandler(async (req, res) => {
     const event = await createEvent(currentUser(req), req.body, req.ipHash);
     res.status(201).json(event);
+  }),
+);
+
+/** Creates a new event from a podium export (`GET /events/:id/export/event.json`). */
+router.post(
+  "/import",
+  requireAuth,
+  requireOrganizerCapability,
+  writeRateLimit,
+  validate({ body: z.object({ data: z.record(z.unknown()), slug: z.string().trim().max(80).optional() }) }),
+  asyncHandler(async (req, res) => {
+    const summary = await importEvent(req.body.data as unknown as EventTransfer, {
+      ownerId: currentUser(req).id,
+      slug: req.body.slug,
+      ipHash: req.ipHash,
+    });
+    res.status(201).json(summary);
   }),
 );
 

@@ -181,7 +181,8 @@ Claimed honestly in `.dogfood.toml`: T1, T2, T3 and T4. The acceptance checker o
 - Rate limiting on authentication, writes, invite acceptance and ballots
 - Bulk roster import from CSV (`email`, `name`, `team`): creates missing accounts, grants the
   role and places participants on teams; CSV/JSON export of submissions, teams, judges,
-  scores, results and the audit log
+  scores, results and the audit log; a whole event exports to JSON and imports back into this
+  or another instance (`POST /api/events/import`, or `npm run event` on the server)
 - Webhooks: organizer-registered URLs receive HMAC-SHA256-signed deliveries for any
   event-scoped audit action, or all of them with `*`. Signatures bind a timestamp and delivery
   id against replay; deliveries are queued and retried with backoff; internal addresses are

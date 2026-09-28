@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { ImportEvent } from "@/components/admin/import-event";
 import { ScreenSkeleton } from "@/components/layout/screen-skeleton";
 import { useSession } from "@/components/providers/session-provider";
 import { ApiError, get } from "@/lib/api";
@@ -114,9 +115,12 @@ export default function OrganizerEventsPage() {
           </p>
         </div>
         {user.isOrganizer ? (
-          <Link href="/events/new" className="btn-primary">
-            + Create event
-          </Link>
+          <div className="flex flex-wrap items-start gap-2.5">
+            <ImportEvent />
+            <Link href="/events/new" className="btn-primary">
+              + Create event
+            </Link>
+          </div>
         ) : null}
       </div>
 

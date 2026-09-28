@@ -79,6 +79,7 @@ flowchart LR
 | --- | --- | --- |
 | GET | `/events` | Public listing, with mode/eligibility/status/theme filters. |
 | POST | `/events` | Organizer capability required. A `slug` the organizer picks is used exactly (lowercased) or refused: `400` for a bad shape or reserved word, `409` with a `suggestion` if another event has it. Without one, a unique link is derived from the name. |
+| POST | `/events/import` | Organizer capability required. `{ data, slug? }` where `data` is an `export/event.json` from any podium instance. Creates a new event owned by the caller. See DATA-MODEL.md. |
 | GET | `/events/slug-availability?slug=` | Organizer capability required. `{ slug, available, reason?, suggestion? }`, for the wizard's live check. |
 | GET / PATCH | `/events/:eventId` | Private events 404 for non-members rather than 403, so their existence is not confirmed. |
 | POST | `/events/:eventId/register` | Public registration: team-or-solo, experience, skills, `REGISTRATION`-stage custom questions, agreements. |
@@ -89,7 +90,7 @@ flowchart LR
 | `/rounds`, `/faq` | Organizer-authored event timeline and FAQ. |
 | `/updates`, `/updates/:id/read`, `/updates/read-all` | Announcements and per-user read receipts. |
 | `/audit` | Organizer-only read of the event's audit trail. |
-| `/export/*.csv`, `/export/event.json` | Organizer-only. Submissions, teams, judges, scores, results, audit, or the whole event as JSON. |
+| `/export/*.csv`, `/export/event.json` | Organizer-only. Submissions, teams, judges, scores, results, audit, or the whole event in the portable transfer format. |
 
 ### Judging (mounted at `/events/:eventId`)
 

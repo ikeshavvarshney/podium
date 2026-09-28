@@ -243,7 +243,27 @@ accounts for new addresses (with a password nobody knows; they sign in by link),
 role, and for participants places each row on its named team, creating the team if needed
 and never breaking the one-team-per-event rule or the event's maximum team size. Rows it
 cannot place are reported with a reason. `GET /events/:id/export/*` streams CSV for
-submissions, teams, judges, scores, results and the audit log, and `export/event.json`
-returns the whole event.
-Both are organizer-only and go through the same `event_memberships` check as everything
-else.
+submissions, teams, judges, scores, results and the audit log.
+
+### Moving a whole event: in and out
+
+`GET /events/:id/export/event.json` is the way out, and `POST /events/import` (or
+`npm run event -- import file.json --owner you@example.org` on the server) is the way back in,
+on this instance or any other:
+
+- The export (format 2) holds every event-scoped table as plain rows, people referenced by
+  email, the ballot digest, and the audit chain head with whether it verified. Webhook secrets,
+  invite and API tokens and voter codes are left out.
+- The import runs in one transaction. It gives every row a new id and remaps every reference
+  to it. Foreign keys are read from Prisma's schema metadata (DMMF), so a new table or column is
+  carried without touching the importer. Ids inside lists and JSON (track scopes, challenge ids,
+  `user:` voter keys, audit metadata) are remapped too. People are matched by email, or created
+  with no usable password, to sign in by link.
+- A normalization run that matched the source's ballots still matches after import, so a
+  published result stays published and verifiable. The audit trail is replayed into a fresh
+  chain, then a `BULK_IMPORT` entry records the source event and its chain head.
+- `tests/integration/event-transfer.test.ts` round-trips `fixtures.json` and checks that the copy
+  ranks every project exactly as the original does.
+
+Everything here is organizer-only and goes through the same `event_memberships` check as
+everything else.

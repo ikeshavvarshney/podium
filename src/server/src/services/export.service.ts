@@ -1,4 +1,5 @@
 import { prisma } from "../db.js";
+import { exportEvent } from "./event-transfer.service.js";
 import type { EventContext } from "./authorization.service.js";
 
 /**
@@ -263,32 +264,7 @@ export async function exportAudit(ctx: EventContext): Promise<string> {
   );
 }
 
-/** Full event snapshot, for migrating an event out of this instance. */
-export async function exportEventJson(ctx: EventContext) {
-  const event = await prisma.event.findUniqueOrThrow({
-    where: { id: ctx.event.id },
-    include: {
-      tracks: true,
-      prizes: true,
-      customQuestions: true,
-      rubric: { include: { criteria: true } },
-      memberships: { include: { user: { select: { email: true, name: true } } } },
-      teams: {
-        include: {
-          members: { include: { user: { select: { email: true, name: true } } } },
-        },
-      },
-      submissions: { include: { images: true, answers: true } },
-      assignments: true,
-      scores: { include: { criterionScores: true } },
-      normalizationRuns: { include: { scores: true } },
-      updates: true,
-    },
-  });
-
-  return {
-    exportedAt: new Date().toISOString(),
-    formatVersion: 1,
-    event,
-  };
+/** Full event snapshot in the portable transfer format; `POST /api/events/import` reads it back. */
+export function exportEventJson(ctx: EventContext) {
+  return exportEvent(ctx.event.id);
 }
