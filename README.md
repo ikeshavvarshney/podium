@@ -86,10 +86,15 @@ npm run dev                      # Web on :3000
 ## Tests
 
 ```bash
+docker compose up -d db         # Postgres on localhost:5433
+docker exec podium-db-1 psql -U podium -c "CREATE DATABASE podium_test"
 cd src/server
-createdb podium_test            # or: docker exec podium-db-1 psql -U podium -c "CREATE DATABASE podium_test"
-npm test                        # runs the suites in the repo-level tests/ folder
+npm install
+npm test                        # generates the Prisma client, then runs the repo-level tests/ folder
 ```
+
+The connection string comes from `src/server/.env.test`, which already points at `podium_test` on
+port 5433.
 
 The suite refuses to run unless `DATABASE_URL` points at a database whose name ends in
 `_test`, so a test run cannot truncate development data.

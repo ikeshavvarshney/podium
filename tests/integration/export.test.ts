@@ -95,6 +95,11 @@ describe("CSV export", () => {
     it("neutralizes a formula injection attempt", () => {
       const csv = toCsv(["a"], [["=cmd|'/c calc'!A1"]]);
       expect(csv).toContain("'=cmd");
+      expect(toCsv(["a"], [["-2+3"], ["@SUM(A1)"]])).toBe("a\r\n'-2+3\r\n'@SUM(A1)\r\n");
+    });
+
+    it("writes negative numbers as numbers, not as escaped text", () => {
+      expect(toCsv(["movement", "z"], [[-1, (-0.25).toFixed(4)]])).toBe("movement,z\r\n-1,-0.2500\r\n");
     });
 
     it("uses CRLF line endings", () => {

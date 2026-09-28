@@ -2,13 +2,17 @@ import { prisma } from "../db.js";
 import type { EventContext } from "./authorization.service.js";
 
 /**
- * RFC 4180 quoting. A field starting with =, +, - or @ is prefixed with a
- * single quote so spreadsheet software does not execute it as a formula.
+ * RFC 4180 quoting. Text starting with =, +, -, @, tab or carriage return is prefixed with a
+ * single quote so spreadsheet software does not execute it as a formula. Numbers are written
+ * as they are: -1 is a value, and quoting it would turn a numeric column into text.
  */
 function cell(value: unknown): string {
   if (value === null || value === undefined) return "";
   let text = String(value);
-  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  // A formatted number such as (-0.5).toFixed(4) arrives as a string, and is still a number.
+  const numeric =
+    (typeof value === "number" && Number.isFinite(value)) || /^-?\d+(\.\d+)?$/.test(text);
+  if (!numeric && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   if (/[",\n\r]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
   return text;
 }
