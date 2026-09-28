@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runProof, simulatePanel, workedExample } from "../../src/server/scripts/normalization-proof.js";
+import { fixtureEvidence, runProof, simulatePanel, workedExample } from "../../src/server/scripts/normalization-proof.js";
 
 describe("normalization proof", () => {
   it("reproduces: the same seed gives the same panel", () => {
@@ -13,6 +13,14 @@ describe("normalization proof", () => {
     // The gain is not a fluke of a few events: the whole confidence interval sits above zero.
     expect(s.ci95.ZSCORE[0]).toBeGreaterThan(0);
     expect(s.winsOverRaw.ZSCORE).toBeGreaterThan(0.8);
+    expect(s.meanSpearman.ZSCORE).toBeGreaterThan(s.meanSpearman.ZSCORE_UNSHRUNK);
+  });
+
+  it("removes most of the judge effect from the fixture ballots", () => {
+    const fx = fixtureEvidence();
+    expect(fx.flat.some((f) => f.startsWith("jdg_07"))).toBe(true);
+    expect(fx.explained.RAW.judge).toBeGreaterThan(0.2);
+    expect(fx.explained.ZSCORE.judge).toBeLessThan(0.1);
   });
 
   it("moves projects a raw mean misplaces", () => {

@@ -90,11 +90,16 @@ flowchart LR
 For each judge `j`, over the ballots that judge actually cast:
 
 ```
-mean_j = mean(totals cast by j)
-sd_j   = population standard deviation(totals cast by j)
+n_j     = ballots cast by j
+mean_j  = mean(totals cast by j)
+var_j   = population variance(totals cast by j)
+m       = mean of every ballot in the event
+v       = pooled within-judge variance (judges with n >= 2 who spread their scores)
 
-z(ballot) = (total - mean_j) / sd_j        when sd_j > epsilon
-          = 0                              otherwise
+mean_j* = (n_j * mean_j + 1 * m) / (n_j + 1)          shrunk toward the panel, prior 1 ballot
+sd_j*   = sqrt((n_j * var_j + 3 * v) / (n_j + 3))     shrunk toward the pool, prior 3 ballots
+
+z(ballot) = (total - mean_j*) / sd_j*     unless j is flat (n_j >= 2 and sd_j = 0): then 0
 ```
 
 A submission's normalized score is the mean of the z-scores it received. For display it
@@ -110,9 +115,17 @@ total has zero discriminating information. Dividing by their standard deviation 
 undefined; treating their scores as extreme is worse. Those ballots contribute `z = 0`:
 they neither help nor hurt, which is the honest reading of a flat ballot set.
 
-**Small samples are the real limitation.** With three ballots per judge, `sd_j` is a
-noisy estimate. Z-scoring is still better than raw averaging, but it is not magic, and
-this is the reason the second method exists.
+**Small samples are why the estimates are shrunk.** With one or two ballots a judge's own
+mean and spread are mostly noise: unshrunk, a judge with a single ballot gets `z = 0` whatever
+they gave, and a judge with two always gives exactly +1 and -1. On the fixture that let one
+project jump from 31st to 8th on two such ballots. Shrinkage is the standard empirical-Bayes
+fix: a thin judge is read mostly on the panel's scale, a well-read judge mostly on their own.
+The priors (1 ballot for the mean, 3 for the variance, since variances are noisier) were
+chosen on the seeded simulation, where shrinkage lifts agreement with the true order from
+0.865 to 0.889 and beats the raw mean in every simulated event. Judges with fewer than three
+ballots are flagged in the preview, and each project shows how many of its evaluations came
+from them. See [docs/normalization-proof.md](docs/normalization-proof.md), including what the
+fixture data can and cannot show.
 
 ### Rank-average
 

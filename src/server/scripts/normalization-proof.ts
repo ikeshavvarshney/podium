@@ -1,6 +1,13 @@
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { normalize, type Ballot, type NormalizationMethod } from "../src/algorithms/normalization.js";
+import {
+  DEFAULT_MEAN_PRIOR,
+  DEFAULT_VARIANCE_PRIOR,
+  normalize,
+  type Ballot,
+  type NormalizationMethod,
+  type NormalizeOptions,
+} from "../src/algorithms/normalization.js";
 
 /**
  * Normalization proof: does per-judge standardization recover the true order of
@@ -91,8 +98,10 @@ function spearman(a: number[], b: number[]): number {
   return 1 - (6 * d2) / (n * (n * n - 1));
 }
 
-function scoresBy(panel: Panel, method: NormalizationMethod): number[] {
-  const result = normalize(panel.ballots, ids, method);
+const UNSHRUNK: NormalizeOptions = { meanPrior: 0, variancePrior: 0 };
+
+function scoresBy(panel: Panel, method: NormalizationMethod, options?: NormalizeOptions): number[] {
+  const result = normalize(panel.ballots, ids, method, options);
   const byId = new Map(result.results.map((r) => [r.submissionId, r]));
   return ids.map((id) => byId.get(id)?.normalizedValue ?? Number.NEGATIVE_INFINITY);
 }
@@ -105,7 +114,7 @@ const sd = (xs: number[]) => {
 
 export interface ProofSummary {
   trials: number;
-  meanSpearman: Record<NormalizationMethod, number>;
+  meanSpearman: Record<NormalizationMethod | "ZSCORE_UNSHRUNK", number>;
   winsOverRaw: Record<"ZSCORE" | "RANK_AVERAGE", number>;
   ci95: { ZSCORE: [number, number]; RANK_AVERAGE: [number, number] };
   judgeMeanSpreadBefore: number;
@@ -113,7 +122,12 @@ export interface ProofSummary {
 
 /** Runs many seeded panels and compares each method's agreement with the true order. */
 export function runProof(trials = 500): ProofSummary {
-  const rho: Record<NormalizationMethod, number[]> = { RAW: [], ZSCORE: [], RANK_AVERAGE: [] };
+  const rho: Record<NormalizationMethod | "ZSCORE_UNSHRUNK", number[]> = {
+    RAW: [],
+    ZSCORE: [],
+    ZSCORE_UNSHRUNK: [],
+    RANK_AVERAGE: [],
+  };
   const beforeSpread: number[] = [];
 
   for (let t = 0; t < trials; t += 1) {
@@ -121,6 +135,7 @@ export function runProof(trials = 500): ProofSummary {
     for (const method of ["RAW", "ZSCORE", "RANK_AVERAGE"] as const) {
       rho[method].push(spearman(scoresBy(panel, method), panel.truth));
     }
+    rho.ZSCORE_UNSHRUNK.push(spearman(scoresBy(panel, "ZSCORE", UNSHRUNK), panel.truth));
 
     // Between-judge spread of mean scores (the severity problem), before and after standardizing.
     const raw = normalize(panel.ballots, ids, "RAW");
@@ -135,13 +150,140 @@ export function runProof(trials = 500): ProofSummary {
   };
   return {
     trials,
-    meanSpearman: { RAW: mean(rho.RAW), ZSCORE: mean(rho.ZSCORE), RANK_AVERAGE: mean(rho.RANK_AVERAGE) },
+    meanSpearman: {
+      RAW: mean(rho.RAW),
+      ZSCORE: mean(rho.ZSCORE),
+      ZSCORE_UNSHRUNK: mean(rho.ZSCORE_UNSHRUNK),
+      RANK_AVERAGE: mean(rho.RANK_AVERAGE),
+    },
     winsOverRaw: {
       ZSCORE: diffs("ZSCORE").filter((d) => d > 0).length / trials,
       RANK_AVERAGE: diffs("RANK_AVERAGE").filter((d) => d > 0).length / trials,
     },
     ci95: { ZSCORE: ci(diffs("ZSCORE")), RANK_AVERAGE: ci(diffs("RANK_AVERAGE")) },
     judgeMeanSpreadBefore: mean(beforeSpread),
+  };
+}
+
+interface FixtureFile {
+  teams: Array<{ id: string }>;
+  projects: Array<{ id: string; team: string; title: string; submitted_at: string }>;
+  scores: Array<{ judge: string; project: string; criteria: Record<string, number> }>;
+}
+
+/**
+ * The organisers' fixtures.json as ballots: one submission per team (the earliest), criteria
+ * weighted evenly, 1-5 mapped onto 0-100 the way the app's rubric does it.
+ */
+export function fixtureBallots(path = fileURLToPath(new URL("../../../fixtures.json", import.meta.url))) {
+  const fx = JSON.parse(readFileSync(path, "utf8")) as FixtureFile;
+  const firstByTeam = new Map<string, string>();
+  for (const p of [...fx.projects].sort((a, b) => a.submitted_at.localeCompare(b.submitted_at))) {
+    if (!firstByTeam.has(p.team)) firstByTeam.set(p.team, p.id);
+  }
+  const kept = new Set(firstByTeam.values());
+  const seen = new Set<string>();
+  const ballots: Ballot[] = [];
+  for (const sc of fx.scores) {
+    const key = `${sc.judge}/${sc.project}`;
+    if (!kept.has(sc.project) || seen.has(key)) continue;
+    seen.add(key);
+    const values = Object.values(sc.criteria);
+    const total = (values.reduce((a, v) => a + (v - 1) / 4, 0) / values.length) * 100;
+    ballots.push({ judgeId: sc.judge, submissionId: sc.project, total: Math.round(total * 100) / 100 });
+  }
+  return { ballots, projectIds: [...kept].sort(), titles: new Map(fx.projects.map((p) => [p.id, p.title])) };
+}
+
+/**
+ * Split-half reliability on the fixture, where no true order exists: each project's ballots are
+ * split at random into two halves, both halves are ranked, and a method that measures projects
+ * rather than panel luck makes the two halves agree more.
+ */
+export function fixtureSplitHalf(splits = 400) {
+  const { ballots } = fixtureBallots();
+  const variants: Array<[string, NormalizationMethod, NormalizeOptions | undefined]> = [
+    ["RAW", "RAW", undefined],
+    ["ZSCORE", "ZSCORE", undefined],
+    ["ZSCORE_UNSHRUNK", "ZSCORE", UNSHRUNK],
+    ["RANK_AVERAGE", "RANK_AVERAGE", undefined],
+  ];
+  const agreement = new Map<string, number[]>(variants.map(([name]) => [name, []]));
+  const bySubmission = new Map<string, Ballot[]>();
+  for (const b of ballots) bySubmission.set(b.submissionId, [...(bySubmission.get(b.submissionId) ?? []), b]);
+  const splittable = [...bySubmission.entries()].filter(([, bs]) => bs.length >= 2);
+
+  for (let t = 0; t < splits; t += 1) {
+    const rand = prng(7000 + t);
+    const a: Ballot[] = [];
+    const b: Ballot[] = [];
+    for (const [, bs] of splittable) {
+      const shuffled = [...bs].sort(() => rand() - 0.5);
+      const half = Math.floor(shuffled.length / 2) || 1;
+      a.push(...shuffled.slice(0, half));
+      b.push(...shuffled.slice(half));
+    }
+    const pids = splittable.map(([id]) => id);
+    for (const [name, method, options] of variants) {
+      const score = (half: Ballot[]) => {
+        const r = normalize(half, pids, method, options);
+        const m = new Map(r.results.map((x) => [x.submissionId, x.normalizedValue]));
+        return pids.map((id) => m.get(id) ?? 0);
+      };
+      agreement.get(name)!.push(spearman(score(a), score(b)));
+    }
+  }
+  const out = Object.fromEntries([...agreement.entries()].map(([k, v]) => [k, mean(v)])) as Record<string, number>;
+  return { splits, projects: splittable.length, ballots: ballots.length, agreement: out };
+}
+
+/** Share of variance explained by a grouping (eta squared). */
+function etaSquared(values: Array<{ group: string; value: number }>): number {
+  const m = mean(values.map((v) => v.value));
+  const total = values.reduce((s, v) => s + (v.value - m) ** 2, 0);
+  const groups = new Map<string, number[]>();
+  for (const v of values) groups.set(v.group, [...(groups.get(v.group) ?? []), v.value]);
+  let between = 0;
+  for (const g of groups.values()) between += g.length * (mean(g) - m) ** 2;
+  return total === 0 ? 0 : between / total;
+}
+
+/** What normalization does to the organisers' fixtures.json, where there is no true order to compare against. */
+export function fixtureEvidence() {
+  const { ballots, projectIds, titles } = fixtureBallots();
+  const explained = (method: NormalizationMethod, options?: NormalizeOptions) => {
+    const r = normalize(ballots, projectIds, method, options);
+    const rows = r.results.flatMap((row) =>
+      row.contributions.map((c) => ({ judge: c.judgeId, project: row.submissionId, value: c.normalized })),
+    );
+    return {
+      judge: etaSquared(rows.map((x) => ({ group: x.judge, value: x.value }))),
+      project: etaSquared(rows.map((x) => ({ group: x.project, value: x.value }))),
+    };
+  };
+  const shrunk = normalize(ballots, projectIds, "ZSCORE");
+  const unshrunk = normalize(ballots, projectIds, "ZSCORE", UNSHRUNK);
+  const movers = (r: ReturnType<typeof normalize>) =>
+    [...r.results]
+      .sort((a, b) => Math.abs(b.rankDelta) - Math.abs(a.rankDelta))
+      .slice(0, 5)
+      .map((row) => ({ title: titles.get(row.submissionId) ?? row.submissionId, raw: row.rawRank, norm: row.normalizedRank, low: row.lowSampleBallots }));
+  const judges = new Set(ballots.map((b) => b.judgeId)).size;
+  return {
+    ballots: ballots.length,
+    projects: projectIds.length,
+    judges,
+    flat: shrunk.judgeStats.filter((j) => j.degenerate).map((j) => `${j.judgeId} (${j.n} ballots at ${j.mean})`),
+    lowSample: shrunk.judgeStats.filter((j) => j.lowSample).length,
+    explained: {
+      RAW: explained("RAW"),
+      ZSCORE: explained("ZSCORE"),
+      ZSCORE_UNSHRUNK: explained("ZSCORE", UNSHRUNK),
+      RANK_AVERAGE: explained("RANK_AVERAGE"),
+    },
+    projectChance: (projectIds.length - 1) / (ballots.length - 1),
+    splitHalf: fixtureSplitHalf(),
+    movers: { shrunk: movers(shrunk), unshrunk: movers(unshrunk) },
   };
 }
 
@@ -183,8 +325,9 @@ function report(): string {
   lines.push("| Method | Mean Spearman with the true order | Beats raw in | Mean gain over raw (95% CI) |", "| --- | ---: | ---: | --- |");
   lines.push(`| Raw mean | ${f(s.meanSpearman.RAW)} | n/a | n/a |`);
   lines.push(
-    `| Per-judge z-score (default) | ${f(s.meanSpearman.ZSCORE)} | ${(s.winsOverRaw.ZSCORE * 100).toFixed(0)}% of events | +${f(s.ci95.ZSCORE[0])} to +${f(s.ci95.ZSCORE[1])} |`,
+    `| Per-judge z-score, shrunk (default) | ${f(s.meanSpearman.ZSCORE)} | ${(s.winsOverRaw.ZSCORE * 100).toFixed(0)}% of events | +${f(s.ci95.ZSCORE[0])} to +${f(s.ci95.ZSCORE[1])} |`,
   );
+  lines.push(`| Per-judge z-score without shrinkage | ${f(s.meanSpearman.ZSCORE_UNSHRUNK)} | n/a | n/a |`);
   lines.push(
     `| Rank average | ${f(s.meanSpearman.RANK_AVERAGE)} | ${(s.winsOverRaw.RANK_AVERAGE * 100).toFixed(0)}% of events | +${f(s.ci95.RANK_AVERAGE[0])} to +${f(s.ci95.RANK_AVERAGE[1])} |`,
   );
@@ -200,11 +343,41 @@ function report(): string {
     lines.push(`| ${row.project} | ${f(row.rawMean, 1)} | ${row.rawRank} | ${row.zRank} | ${row.moved > 0 ? "+" : ""}${row.moved} | ${row.trueRank} |`);
   }
   lines.push("");
+  const fx = fixtureEvidence();
+  const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+  lines.push("## On the fixture data", "");
+  lines.push(
+    `The organisers' \`fixtures.json\` as imported: ${fx.ballots} ballots from ${fx.judges} judges on ${fx.projects} projects. It has no true order, so the question it can answer is different: how much of a ballot is the judge, and how much is the project?`,
+    "",
+    `- Flat judge detected: ${fx.flat.join(", ") || "none"}. Their ballots contribute 0.`,
+    `- ${fx.lowSample} of ${fx.judges} judges cast fewer than 3 ballots, so their scale is mostly the panel's prior.`,
+    "",
+    "| Method | Variance explained by which judge | Variance explained by which project |",
+    "| --- | ---: | ---: |",
+    `| Raw weighted total | ${pct(fx.explained.RAW.judge)} | ${pct(fx.explained.RAW.project)} |`,
+    `| Per-judge z-score, shrunk (default) | ${pct(fx.explained.ZSCORE.judge)} | ${pct(fx.explained.ZSCORE.project)} |`,
+    `| Per-judge z-score without shrinkage | ${pct(fx.explained.ZSCORE_UNSHRUNK.judge)} | ${pct(fx.explained.ZSCORE_UNSHRUNK.project)} |`,
+    `| Rank average | ${pct(fx.explained.RANK_AVERAGE.judge)} | ${pct(fx.explained.RANK_AVERAGE.project)} |`,
+    "",
+    `In the raw totals, which judge you drew explains ${pct(fx.explained.RAW.judge)} of the variance. Normalization removes almost all of it; the shrunk z-score keeps a little on purpose, because with two ballots a judge's mean is as much their projects as their severity.`,
+    "",
+    `The honest caveat: the variance explained by project is at the level chance alone gives with ${fx.projects} groups over ${fx.ballots} ballots (${pct(fx.projectChance)}). A split-half test agrees: splitting each project's ballots at random into two halves and ranking each half, the halves correlate at ${fx.splitHalf.agreement.RAW!.toFixed(3)} raw and ${fx.splitHalf.agreement.ZSCORE!.toFixed(3)} normalized over ${fx.splitHalf.splits} splits. The fixture's scores carry judge effects but almost no project signal, so no method can recover an order from them, and the simulation above is where recovery is measured.`,
+    "",
+    "Largest rank movements on the fixture:",
+    "",
+    "| Estimator | Project (raw rank to normalized rank, thin-judge ballots) |",
+    "| --- | --- |",
+    `| Shrunk (default) | ${fx.movers.shrunk.map((m) => `${m.title} ${m.raw} to ${m.norm} (${m.low})`).join("; ")} |`,
+    `| Unshrunk | ${fx.movers.unshrunk.map((m) => `${m.title} ${m.raw} to ${m.norm} (${m.low})`).join("; ")} |`,
+    "",
+    "Without shrinkage, projects read by one- and two-ballot judges make the largest jumps, because those judges are standardized against themselves. Shrinkage takes most of that out.",
+    "",
+  );
   lines.push("## Why it works, and where it does not", "");
   lines.push(
     "- A judge's score is `bias + scale * quality + noise`. Standardizing per judge subtracts the bias and divides out the scale, so two judges who agree on order but not on scale become interchangeable.",
     "- A judge who scores everything the same carries no ordering information. The z-score gives that judge zero rather than a spurious high or low, so a flat ballot set never lifts or sinks a project.",
-    "- The method needs each judge to read several projects. With very few ballots per judge the mean and spread are noisy, which is why the preview shows every method side by side and flags projects the methods disagree on.",
+    `- With few ballots per judge the mean and spread are noisy. Each judge's mean is shrunk toward the panel mean with a prior of ${DEFAULT_MEAN_PRIOR} ballot and their variance toward the pooled within-judge variance with a prior of ${DEFAULT_VARIANCE_PRIOR}, so a judge with one or two ballots is read mostly on the panel's scale instead of being standardized against themselves. The table shows the gain over the unshrunk estimator.`,
     "- It cannot rescue a judge who is noisy rather than biased, and it assumes judges are not colluding. See [SECURITY.md](SECURITY.md) for the threat model.",
     "",
     "The maths is in [JUDGING.md](../JUDGING.md). The assertions behind these numbers run in CI: `tests/unit/normalization-proof.test.ts`.",

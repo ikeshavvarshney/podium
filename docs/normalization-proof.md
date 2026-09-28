@@ -9,10 +9,11 @@ Judges differ in severity (mean 45 to 85) and spread (4 to 16 points), one judge
 | Method | Mean Spearman with the true order | Beats raw in | Mean gain over raw (95% CI) |
 | --- | ---: | ---: | --- |
 | Raw mean | 0.749 | n/a | n/a |
-| Per-judge z-score (default) | 0.865 | 94% of events | +0.109 to +0.123 |
+| Per-judge z-score, shrunk (default) | 0.889 | 100% of events | +0.134 to +0.146 |
+| Per-judge z-score without shrinkage | 0.865 | n/a | n/a |
 | Rank average | 0.838 | 86% of events | +0.082 to +0.096 |
 
-Judges' mean scores spread with a standard deviation of **12.40** points, which is the severity problem. Standardizing sets every judge's mean to zero by construction, so that number alone proves nothing: the table above is the evidence, because it measures agreement with the true order.
+Judges' mean scores spread with a standard deviation of **12.61** points, which is the severity problem. Standardizing sets every judge's mean to zero by construction, so that number alone proves nothing: the table above is the evidence, because it measures agreement with the true order.
 
 ## One event, project by project
 
@@ -20,22 +21,49 @@ The ten largest ranking movements in seed 1000. `moved` is positive when normali
 
 | Project | Raw mean | Raw rank | Normalized rank | Moved | True rank |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| p-33 | 77.3 | 5 | 28 | -23 | 26 |
-| p-14 | 78.0 | 2 | 23 | -21 | 21 |
-| p-36 | 65.0 | 22 | 3 | +19 | 2 |
-| p-34 | 69.5 | 18 | 36 | -18 | 36 |
-| p-26 | 65.5 | 20 | 38 | -18 | 28 |
-| p-0 | 57.8 | 29 | 13 | +16 | 17 |
-| p-30 | 77.3 | 3 | 19 | -16 | 11 |
-| p-17 | 63.0 | 24 | 9 | +15 | 14 |
+| p-14 | 78.0 | 2 | 19 | -17 | 21 |
+| p-34 | 69.5 | 18 | 35 | -17 | 36 |
+| p-36 | 65.0 | 22 | 7 | +15 | 2 |
+| p-33 | 77.3 | 5 | 20 | -15 | 26 |
 | p-16 | 71.9 | 15 | 1 | +14 | 3 |
-| p-23 | 60.3 | 27 | 14 | +13 | 9 |
+| p-17 | 63.0 | 24 | 12 | +12 | 14 |
+| p-3 | 72.2 | 14 | 3 | +11 | 5 |
+| p-1 | 70.9 | 16 | 5 | +11 | 13 |
+| p-23 | 60.3 | 27 | 16 | +11 | 9 |
+| p-0 | 57.8 | 29 | 18 | +11 | 17 |
+
+## On the fixture data
+
+The organisers' `fixtures.json` as imported: 122 ballots from 30 judges on 40 projects. It has no true order, so the question it can answer is different: how much of a ballot is the judge, and how much is the project?
+
+- Flat judge detected: jdg_07 (3 ballots at 75). Their ballots contribute 0.
+- 9 of 30 judges cast fewer than 3 ballots, so their scale is mostly the panel's prior.
+
+| Method | Variance explained by which judge | Variance explained by which project |
+| --- | ---: | ---: |
+| Raw weighted total | 27.0% | 30.9% |
+| Per-judge z-score, shrunk (default) | 3.5% | 33.0% |
+| Per-judge z-score without shrinkage | 0.0% | 33.3% |
+| Rank average | 0.0% | 31.7% |
+
+In the raw totals, which judge you drew explains 27.0% of the variance. Normalization removes almost all of it; the shrunk z-score keeps a little on purpose, because with two ballots a judge's mean is as much their projects as their severity.
+
+The honest caveat: the variance explained by project is at the level chance alone gives with 40 groups over 122 ballots (32.2%). A split-half test agrees: splitting each project's ballots at random into two halves and ranking each half, the halves correlate at -0.005 raw and 0.023 normalized over 400 splits. The fixture's scores carry judge effects but almost no project signal, so no method can recover an order from them, and the simulation above is where recovery is measured.
+
+Largest rank movements on the fixture:
+
+| Estimator | Project (raw rank to normalized rank, thin-judge ballots) |
+| --- | --- |
+| Shrunk (default) | Small Relay 13 to 29 (0); Dry Harbour 31 to 17 (2); Flat Meadow 23 to 36 (0); Small Loom 15 to 23 (1); Paper Anchor 19 to 27 (1) |
+| Unshrunk | Dry Harbour 31 to 8 (2); Small Relay 13 to 30 (0); Glass Signal 23 to 9 (2); Flat Meadow 23 to 37 (0); Deep Beacon 10 to 22 (0) |
+
+Without shrinkage, projects read by one- and two-ballot judges make the largest jumps, because those judges are standardized against themselves. Shrinkage takes most of that out.
 
 ## Why it works, and where it does not
 
 - A judge's score is `bias + scale * quality + noise`. Standardizing per judge subtracts the bias and divides out the scale, so two judges who agree on order but not on scale become interchangeable.
 - A judge who scores everything the same carries no ordering information. The z-score gives that judge zero rather than a spurious high or low, so a flat ballot set never lifts or sinks a project.
-- The method needs each judge to read several projects. With very few ballots per judge the mean and spread are noisy, which is why the preview shows every method side by side and flags projects the methods disagree on.
+- With few ballots per judge the mean and spread are noisy. Each judge's mean is shrunk toward the panel mean with a prior of 1 ballot and their variance toward the pooled within-judge variance with a prior of 3, so a judge with one or two ballots is read mostly on the panel's scale instead of being standardized against themselves. The table shows the gain over the unshrunk estimator.
 - It cannot rescue a judge who is noisy rather than biased, and it assumes judges are not colluding. See [SECURITY.md](SECURITY.md) for the threat model.
 
 The maths is in [JUDGING.md](../JUDGING.md). The assertions behind these numbers run in CI: `tests/unit/normalization-proof.test.ts`.

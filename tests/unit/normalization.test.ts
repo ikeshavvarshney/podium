@@ -11,6 +11,8 @@ const ballot = (judgeId: string, submissionId: string, total: number): Ballot =>
   total,
 });
 
+const UNSHRUNK = { meanPrior: 0, variancePrior: 0 };
+
 const rankOf = (result: ReturnType<typeof normalize>, submissionId: string) =>
   result.results.find((r) => r.submissionId === submissionId)!.normalizedRank;
 
@@ -73,7 +75,7 @@ describe("normalize: correcting for judge severity", () => {
     expect(rawRankOf(raw, "generousTop")).toBeLessThan(rawRankOf(raw, "harshTop"));
     expect(rawRankOf(raw, "other3")).toBeLessThan(rawRankOf(raw, "harshTop"));
 
-    const z = normalize(ballots, ids, "ZSCORE");
+    const z = normalize(ballots, ids, "ZSCORE", UNSHRUNK);
     // Normalized: each judge's best project ties at the top.
     expect(rankOf(z, "harshTop")).toBe(rankOf(z, "generousTop"));
     // And the harsh judge's best now beats the generous judge's worst.
@@ -93,7 +95,7 @@ describe("normalize: correcting for judge severity", () => {
     ];
     const ids = ["w1", "w2", "w3", "n1", "n2", "n3"];
 
-    const z = normalize(ballots, ids, "ZSCORE");
+    const z = normalize(ballots, ids, "ZSCORE", UNSHRUNK);
     // Each judge's top project ties, despite a 33-point raw gap.
     expect(rankOf(z, "w1")).toBe(rankOf(z, "n1"));
     expect(rankOf(z, "w3")).toBe(rankOf(z, "n3"));
@@ -114,6 +116,40 @@ describe("normalize: correcting for judge severity", () => {
     const underdog = z.results.find((r) => r.submissionId === "underdog")!;
     // Positive delta means it climbed once severity was accounted for.
     expect(underdog.rankDelta).toBeGreaterThan(0);
+  });
+});
+
+describe("normalize: small samples", () => {
+  const panel = [
+    ballot("j1", "a", 80), ballot("j1", "b", 60), ballot("j1", "c", 40), ballot("j1", "d", 70),
+    ballot("j2", "a", 75), ballot("j2", "b", 65), ballot("j2", "c", 45), ballot("j2", "d", 55),
+  ];
+
+  it("lets a single low ballot count against a project instead of vanishing", () => {
+    const z = normalize([...panel, ballot("solo", "e", 20), ballot("j1", "e", 60)], ["a", "b", "c", "d", "e"], "ZSCORE");
+    const e = z.results.find((r) => r.submissionId === "e")!;
+    const solo = e.contributions.find((c) => c.judgeId === "solo")!;
+    expect(solo.normalized).toBeLessThan(0);
+
+    const unshrunk = normalize([...panel, ballot("solo", "e", 20), ballot("j1", "e", 60)], ["a", "b", "c", "d", "e"], "ZSCORE", UNSHRUNK);
+    expect(unshrunk.results.find((r) => r.submissionId === "e")!.contributions.find((c) => c.judgeId === "solo")!.normalized).toBe(0);
+  });
+
+  it("flags low-sample judges and counts their ballots per project", () => {
+    const z = normalize([...panel, ballot("solo", "a", 90)], ["a", "b", "c", "d"], "ZSCORE");
+    expect(z.judgeStats.find((s) => s.judgeId === "solo")!.lowSample).toBe(true);
+    expect(z.judgeStats.find((s) => s.judgeId === "j1")!.lowSample).toBe(false);
+    expect(z.results.find((r) => r.submissionId === "a")!.lowSampleBallots).toBe(1);
+    expect(z.results.find((r) => r.submissionId === "b")!.lowSampleBallots).toBe(0);
+  });
+
+  it("pulls a thin judge's scale toward the panel, and leaves a well-read judge nearly alone", () => {
+    const stats = computeJudgeStats([...panel, ballot("thin", "a", 95), ballot("thin", "b", 85)]);
+    const thin = stats.find((s) => s.judgeId === "thin")!;
+    const j1 = stats.find((s) => s.judgeId === "j1")!;
+    expect(thin.shrunkMean).toBeLessThan(thin.mean);
+    expect(thin.shrunkSd).toBeGreaterThan(thin.sd);
+    expect(Math.abs(j1.shrunkMean - j1.mean)).toBeLessThan(Math.abs(thin.shrunkMean - thin.mean));
   });
 });
 

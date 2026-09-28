@@ -22,7 +22,22 @@ export interface JudgeStat {
   sd: number;
   /** True when the judge gave effectively identical scores throughout. */
   degenerate: boolean;
+  /** Too few ballots for the judge's own mean and spread to be trusted on their own. */
+  lowSample: boolean;
+  /** The mean and sd the z-score actually uses, after shrinking toward the panel. */
+  shrunkMean: number;
+  shrunkSd: number;
 }
+
+/** Prior strength in pseudo-ballots pulling a judge's mean and variance toward the panel's. 0 disables it. */
+export interface NormalizeOptions {
+  meanPrior?: number;
+  variancePrior?: number;
+}
+
+export const DEFAULT_MEAN_PRIOR = 1;
+export const DEFAULT_VARIANCE_PRIOR = 3;
+export const LOW_SAMPLE_BALLOTS = 3;
 
 export interface SubmissionResult {
   submissionId: string;
@@ -34,6 +49,8 @@ export interface SubmissionResult {
   /** Positive means the submission moved up under normalization. */
   rankDelta: number;
   contributions: Array<{ judgeId: string; total: number; normalized: number }>;
+  /** Ballots from judges with fewer than LOW_SAMPLE_BALLOTS ballots, whose scale is mostly prior. */
+  lowSampleBallots: number;
 }
 
 export interface NormalizationResult {
@@ -53,43 +70,59 @@ const round = (n: number, places = 4): number => {
   return Math.round(n * factor) / factor;
 };
 
-export function computeJudgeStats(ballots: Ballot[]): JudgeStat[] {
+export function computeJudgeStats(ballots: Ballot[], options: NormalizeOptions = {}): JudgeStat[] {
+  const km = options.meanPrior ?? DEFAULT_MEAN_PRIOR;
+  const kv = options.variancePrior ?? DEFAULT_VARIANCE_PRIOR;
   const byJudge = new Map<string, number[]>();
   for (const b of ballots) {
     if (!byJudge.has(b.judgeId)) byJudge.set(b.judgeId, []);
     byJudge.get(b.judgeId)!.push(b.total);
   }
 
-  return [...byJudge.entries()]
-    .map(([judgeId, totals]) => {
-      const n = totals.length;
-      const mean = totals.reduce((s, t) => s + t, 0) / n;
-      // Population standard deviation: these are all the ballots the judge
-      // cast, not a sample drawn from a larger set.
-      const variance = totals.reduce((s, t) => s + (t - mean) ** 2, 0) / n;
+  const raw = [...byJudge.entries()].map(([judgeId, totals]) => {
+    const n = totals.length;
+    const mean = totals.reduce((s, t) => s + t, 0) / n;
+    // Population variance: these are all the ballots the judge cast, not a sample.
+    const variance = totals.reduce((s, t) => s + (t - mean) ** 2, 0) / n;
+    return { judgeId, n, mean, variance };
+  });
+
+  // Panel priors: the grand mean, and the pooled within-judge variance of judges who spread.
+  const all = ballots.map((b) => b.total);
+  const grandMean = all.length ? all.reduce((s, t) => s + t, 0) / all.length : 0;
+  const spreaders = raw.filter((j) => j.n >= 2 && Math.sqrt(j.variance) > SD_EPSILON);
+  const spreadWeight = spreaders.reduce((s, j) => s + j.n, 0);
+  const pooledVariance = spreadWeight
+    ? spreaders.reduce((s, j) => s + j.n * j.variance, 0) / spreadWeight
+    : 0;
+
+  return raw
+    .map(({ judgeId, n, mean, variance }) => {
       const sd = Math.sqrt(variance);
+      const shrunkMean = (n * mean + km * grandMean) / (n + km);
+      const shrunkSd = Math.sqrt((n * variance + kv * pooledVariance) / (n + kv));
       return {
         judgeId,
         n,
         mean: round(mean),
         sd: round(sd),
-        degenerate: sd <= SD_EPSILON,
+        // One ballot is not a flat judge, just an unknown one; shrinkage handles it.
+        degenerate: n >= 2 && sd <= SD_EPSILON,
+        lowSample: n < LOW_SAMPLE_BALLOTS,
+        shrunkMean: round(shrunkMean),
+        shrunkSd: round(shrunkSd),
       };
     })
     .sort((a, b) => a.judgeId.localeCompare(b.judgeId));
 }
 
 /**
- * Per-judge z-score. Corrects for severity (a low mean) and for spread (a judge
- * who only uses part of the scale).
- *
- * A judge with no spread contributes 0, which is neutral: a flat ballot set
- * carries no information about which project is better, so it should neither
- * lift nor sink anyone.
+ * Per-judge z-score against the judge's shrunk mean and sd, correcting severity and spread. A
+ * flat judge contributes 0: identical scores say nothing about which project is better.
  */
 function zScoreOf(total: number, stat: JudgeStat): number {
-  if (stat.degenerate) return 0;
-  return (total - stat.mean) / stat.sd;
+  if (stat.degenerate || stat.shrunkSd <= SD_EPSILON) return 0;
+  return (total - stat.shrunkMean) / stat.shrunkSd;
 }
 
 /**
@@ -126,8 +159,9 @@ export function normalize(
   ballots: Ballot[],
   submissionIds: string[],
   method: NormalizationMethod = "ZSCORE",
+  options: NormalizeOptions = {},
 ): NormalizationResult {
-  const judgeStats = computeJudgeStats(ballots);
+  const judgeStats = computeJudgeStats(ballots, options);
   const statById = new Map(judgeStats.map((s) => [s.judgeId, s]));
 
   const byJudge = new Map<string, Ballot[]>();
@@ -177,6 +211,7 @@ export function normalize(
       normalizedRank: 0,
       rankDelta: 0,
       contributions,
+      lowSampleBallots: subBallots.filter((b) => statById.get(b.judgeId)!.lowSample).length,
     });
   }
 

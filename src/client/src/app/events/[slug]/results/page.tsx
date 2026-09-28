@@ -19,6 +19,9 @@ interface JudgeStat {
   mean: number;
   sd: number;
   degenerate: boolean;
+  lowSample?: boolean;
+  shrunkMean?: number;
+  shrunkSd?: number;
   tendency: string;
 }
 
@@ -35,6 +38,7 @@ interface Standing {
   rankDelta: number;
   ballotCount: number;
   contributions: Array<{ judgeId: string; total: number; normalized: number }>;
+  lowSampleBallots?: number;
 }
 
 interface Preview {
@@ -311,7 +315,14 @@ export default function ResultsPage() {
                     </td>
                     <td className="max-w-0 py-[13px] pr-3">
                       <div className="truncate text-ui">{row.name}</div>
-                      <div className="truncate text-meta text-muted">{row.team}</div>
+                      <div className="truncate text-meta text-muted">
+                        {row.team}
+                        {method === "ZSCORE" && (row.lowSampleBallots ?? 0) > 0 ? (
+                          <span title="Some evaluations come from judges with too few ballots to calibrate on their own; their scale is pulled toward the panel's." className="ml-1.5 text-warning-text">
+                            · {row.lowSampleBallots} thin-judge evaluation{row.lowSampleBallots === 1 ? "" : "s"}
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="py-[13px] font-mono text-label uppercase tracking-stamp text-muted">{row.track ?? "-"}</td>
                     <td className="py-[13px] text-right font-mono text-ui text-muted">{row.rawMean.toFixed(1)}</td>
@@ -431,6 +442,7 @@ export default function ResultsPage() {
                   <div className="text-meta text-muted">
                     {stat.n} evaluation{stat.n === 1 ? "" : "s"}
                     {stat.degenerate && stat.n > 1 ? " · no spread" : ""}
+                    {stat.lowSample && stat.n > 0 ? " · low sample, shrunk toward panel" : ""}
                   </div>
                 </div>
                 <span className="text-right font-mono text-ui">{stat.mean.toFixed(1)}</span>
