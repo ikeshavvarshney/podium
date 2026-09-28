@@ -72,9 +72,13 @@ someone else's data.
     "sign out everywhere").
   - `sessions.revoked_at` invalidates **one** device without touching the others. Every
     login opens a `Session` row; `attachUser` checks it whenever the token carries a `sid`.
-- Passwordless sign-in issues a single-use `SignInToken` (hashed at rest, short expiry)
-  and emails nobody, because the platform sends no email: the link is shown on screen for
-  a self-hosted deployment to relay however it likes.
+- Passwordless sign-in issues a single-use `SignInToken` (hashed at rest, 15-minute expiry).
+  `lib/mailer.ts` sends it over SMTP when `SMTP_URL` is set; otherwise, to keep the platform
+  offline, it is written to the API log for the operator to relay.
+- Scripts use API tokens (`pod_...`, hashed at rest, revocable, optionally limited to one event,
+  where they act as their owner and nowhere else, without the organizer capability). A token
+  cannot mint another. Session and record-signing secrets are generated on first boot and kept
+  in `instance_secrets`; production refuses the old published development secret.
 - Login on a missing account still performs a password verification against a dummy hash,
   so response timing does not disclose whether an email is registered.
 
@@ -183,9 +187,9 @@ ballot may be cast, reading the event's voting dates, its status and the config'
 `enabled` flag. A ballot outside the window is refused and written to the audit log as
 `VOTE_REJECTED` with the reason.
 
-**Who.** `resolveVoter` derives a `voterKey` from the session (`user:<id>`), a supplied
-address under email gating (`email:<address>`), or the hashed client IP on an open link
-(`ip:<hash>`). A client cannot nominate the identity it votes as, and duplicate
+**Who.** `resolveVoter` derives a `voterKey` from the session (`user:<id>`), an address
+proved with a six-digit code under email gating (`email:<address>`), or a per-browser cookie on
+an open link (`device:<id>`, capped per address per hour). A client cannot nominate the identity it votes as, and duplicate
 detection is the `votes (event_id, submission_id, voter_key)` unique constraint rather
 than an application check.
 

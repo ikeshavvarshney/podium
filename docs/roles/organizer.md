@@ -54,7 +54,7 @@ gets a role by asking the server for it, and a client can never nominate its own
 | Admin | Granted by email | Event admin only |
 
 Granting a single role by email requires the account to **already exist**: the platform
-sends no email, so an unknown address is reported back rather than invited. A roster
+does not email invitations, so an unknown address is reported back rather than invited. A roster
 import is the exception: it creates the missing accounts, which then sign in by link. The same account can hold several roles in one event, but
 never the same role twice.
 
@@ -191,7 +191,7 @@ A **private** event is invisible, returning "not found", to anyone with no membe
 5. **Open submissions.** Teams draft and submit. Watch the dashboard for empty teams.
 6. **Assign judges.** Generate, review the balance, adjust by hand.
 7. **Judging window.** Track progress, message judges who are behind (the dashboard offers
-   a copyable reminder; the platform sends no email).
+   a copyable reminder; reminders are not emailed).
 8. **Normalize.** Preview each method, run one, check the methods agree.
 9. **Publish** after the review dialog. Post an update announcing the winners.
 10. **Voting** may run alongside; its tally is separate from judging.

@@ -118,11 +118,11 @@ Open the event, then **Settings**.
 
 1. **Event status:** change the state.
 2. **Visibility and sharing:** try Public, Link only and Private. Copy the share link and check each one from the private window.
-3. **Voting:** one vote per person is the default. Switch to quadratic and set how many credits each person gets. The credits are required.
+3. **Voting:** headcount (one vote per project) is the default; set "Projects each voter may back" to One for one vote per person. Switch to quadratic and set how many credits each person gets. The credits are required.
 4. **Rubric:** add criteria and weights. The weights must add up to 100 or the app should refuse.
-5. **Webhooks:** add a URL subscribed to **all events**, do anything in the event (add a FAQ item, post an update), and check the delivery log.
+5. **Webhooks:** add a URL subscribed to **all events**, do anything in the event (add a FAQ item, post an update), and check the delivery log. `http://169.254.169.254/` or `http://db:5432/` should be refused as internal. Point a hook at a dead URL: the delivery shows as retrying, and "retry now" sends it again.
 6. **Bulk import:** upload a CSV with `email,name,team` columns, including one address that has no account and two rows on the same team. The people should appear under **Roles**, the new account should exist, and the team should appear under **Teams**. A row for a full team is reported, not placed.
-7. **Exports:** download the CSV and JSON files.
+7. **Exports:** download the CSV and JSON files. On **My events**, **Import event** takes that JSON and creates a copy that ranks exactly like the original.
 8. Add a round, a FAQ item and an announcement. Check that participants can see them.
 
 ### Roles
@@ -135,11 +135,12 @@ Open the event, then **Settings**.
 1. Open **Assign**. Assign judges by hand, then try the automatic option.
 2. Open **Manage** to see progress: who has started, who has not, and how many reviews each project has.
 3. Run normalization. Look at the raw scores, the adjusted scores and the final ranking.
-4. Publish the results. Then check the winners page while signed out.
+4. Look at **Panel integrity** on the results screen: on `sample-hack-2026` it names the flat judge, Iva Petrova.
+5. Publish the results. Then check the winners page while signed out. As a judge, try to change a score: it is refused while results are published.
 
 ### Voting
 
-1. Open **Voting** for `orbit-cup`. Choose who can vote: anyone with the link, email only, or signed in users.
+1. Open **Voting** for `orbit-cup`. Choose who can vote: anyone with the link, email only, or signed in users. With **email gated**, the vote page asks for an address and a six-digit code; without `SMTP_URL`, the code is in `docker compose logs server`.
 2. In the private window, open **Vote** and cast votes. You should not be able to vote for your own project. Different voters should see projects in a different order. Totals should stay hidden.
 3. As organizer, look at the ballots, then close the voting. Totals should now show.
 4. Try to change the voting type after voting has started. The app should refuse.
@@ -147,7 +148,12 @@ Open the event, then **Settings**.
 
 ### Audit log
 
-Open the audit log. It should list sign ins, role changes, submissions, scores and refused late edits.
+Open **Audit**. It should list sign ins, role changes, submissions, scores (a changed score shows its values before and after, under "detail") and refused late edits, and say the chain is intact. `UPDATE audit_logs ...` in `psql` is refused by the database.
+
+### API tokens and uploads
+
+1. On **Profile**, create an API token limited to one event. `curl -H "Authorization: Bearer pod_..." localhost:4000/api/events/<that event>/progress` works; the same call on another event returns 401.
+2. On **My project**, upload a thumbnail. An SVG is refused.
 
 ## 6. Admin
 

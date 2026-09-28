@@ -69,7 +69,7 @@ A team belongs to one event, and an account is on at most one team per event.
 | Action | Who may do it | Notes |
 | --- | --- | --- |
 | Create a team | Any participant not already on a team | Becomes the team **owner** |
-| Invite people with a link | Team owner only | Links can have a use limit and an expiry, can be revoked, are stored hashed and are shown once. The platform sends no email, so the owner relays the link |
+| Invite people with a link | Team owner only | Links can have a use limit and an expiry, can be revoked, are stored hashed and are shown once. Invitations are not emailed, so the owner relays the link |
 | Post the team on the board ("looking for members") | Team owner | Board is read-only once registration closes |
 | Post yourself as looking for a team | A participant without a team | Private until both sides agree |
 | Ask to join a team, or invite a person | Participant / team owner | Two-sided handshake: nothing changes until the other side accepts. Only the other side may answer |
@@ -194,8 +194,8 @@ role there, and even then you never receive your own team's project.
 deciding who sits on the panel. A role is granted by an event admin, by email, to an
 existing account.
 
-**I was invited, but I have no account.** Create one first. The platform sends no email
-and cannot invite an address that has no account; the organizer grants the role once the
+**I was invited, but I have no account.** Create one first. The platform does not email
+invitations and cannot invite an address that has no account; the organizer grants the role once the
 account exists.
 
 **Does the organizer capability make me an organizer of every event?** No. It only lets an
