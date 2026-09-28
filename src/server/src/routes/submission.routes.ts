@@ -8,7 +8,7 @@ import {
   loadEventContext,
   requireEventAdmin,
 } from "../middleware/event-context.js";
-import { writeRateLimit } from "../middleware/rate-limit.js";
+import { readRateLimit, writeRateLimit } from "../middleware/rate-limit.js";
 import { httpUrl, validate } from "../middleware/validate.js";
 import {
   galleryFacets,
@@ -67,6 +67,7 @@ const galleryQuerySchema = z.object({
 
 router.get(
   "/",
+  readRateLimit,
   asyncHandler(loadEventContext),
   validate({ query: galleryQuerySchema }),
   asyncHandler(async (req, res) => {

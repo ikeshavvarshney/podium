@@ -22,6 +22,7 @@ import {
   getJudgingProgress,
   getMyQueue,
   getMyScore,
+  getPanelIntegrity,
   skipAssignment,
   submitScore,
   unassignJudge,
@@ -167,6 +168,17 @@ router.delete(
   asyncHandler(async (req, res) => {
     await unassignJudge(eventContext(req), req.params.assignmentId as string, req.ipHash);
     res.status(204).end();
+  }),
+);
+
+/** Organizer-only signals about the panel: lockstep pairs, outlier ballots, conflicts. */
+router.get(
+  "/judging/integrity",
+  requireAuth,
+  asyncHandler(loadEventContext),
+  requireEventAdmin,
+  asyncHandler(async (req, res) => {
+    res.json(await getPanelIntegrity(eventContext(req)));
   }),
 );
 

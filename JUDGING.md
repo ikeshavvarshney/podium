@@ -234,6 +234,20 @@ ballot records its criterion values before and after. The log is hash-chained an
 the database (see [ARCHITECTURE.md](ARCHITECTURE.md#audit-log)), and the Audit screen verifies
 the chain on every visit.
 
+### Panel integrity
+
+Before publishing, the results screen asks the questions a careful organizer would:
+
+- **Lockstep pairs.** Two judges with three or more projects in common who gave identical totals
+  on all of them, or whose totals correlate at 0.95 or more over four or more.
+- **Outlier ballots.** A ballot whose z-score sits two standard deviations or more from the mean of
+  the other judges on the same project (projects with three ballots or more).
+- **Flat judges.** Everyone who gave the same total to every project, whose ballots count as 0.
+- **Conflicts.** A judge assigned a team where a member shares their organization.
+
+These are flags, never automatic changes. Coordinated judging that stays under the thresholds is
+not caught, which SECURITY.md says plainly.
+
 ## 8. Comparative mode
 
 `rubrics.mode = COMPARATIVE` is the alternative to absolute scoring. Instead of rating

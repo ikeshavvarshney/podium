@@ -195,7 +195,7 @@ Claimed honestly in `.dogfood.toml`: T1, T2, T3 and T4. The acceptance checker o
 
 - Webhook retries stop after six attempts over about two and a half hours; after that a
   delivery is marked failed and waits for a manual retry.
-- Nothing detects colluding judges or scraping of the public gallery; see the named threats in [docs/SECURITY.md](docs/SECURITY.md).
+- Collusion checks flag lockstep judge pairs, outlier ballots and same-organization assignments, but cannot prove intent, and the gallery's read limit slows a crawler rather than stopping one spread across many addresses; see [docs/SECURITY.md](docs/SECURITY.md).
 - No file uploads. Images are referenced by URL, which keeps the deployment free of
   object storage.
 - Email goes out only when `SMTP_URL` points at a mail server. Without one (the offline default)

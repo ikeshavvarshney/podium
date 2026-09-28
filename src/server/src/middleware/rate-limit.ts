@@ -127,6 +127,13 @@ export const authRateLimit = rateLimit("auth", {
   message: "Too many authentication attempts. Try again in a few minutes.",
 });
 
+/** Public reads: plenty for a person browsing, a brake on bulk harvesting. */
+export const readRateLimit = rateLimit("read", {
+  windowMs: 60_000,
+  max: 240,
+  message: "Too many requests for the gallery. Slow down and try again shortly.",
+});
+
 export const writeRateLimit = rateLimit("write", {
   windowMs: 60_000,
   max: 120,

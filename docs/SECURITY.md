@@ -163,9 +163,11 @@ that backs the claim.
 
 *Attack:* bulk-harvest projects, descriptions and links.
 
-- **Not addressed.** The gallery is public by design, so there is nothing to protect from a visitor.
-  Read routes have no rate limit. Drafts are never returned to the public, private events return
-  404, and results stay hidden until publication, but a published gallery can be crawled.
+- **Reduced.** The gallery is public by design, so there is nothing to protect from a visitor, but
+  the gallery listing is limited to 240 requests a minute per address, which is far above a person
+  browsing and a brake on harvesting. Drafts are never returned to the public, private events return
+  404, and results stay hidden until publication. A patient crawler across many addresses still
+  gets the published gallery.
 - **If it matters.** Put a reverse proxy with rate limiting in front, or make the event private or
   link only. The embeddable gallery exposes only what the public gallery already shows.
 
@@ -179,9 +181,13 @@ that backs the claim.
   it. Each project is read by several judges, and per-judge normalization limits how far one
   harsh or generous judge moves a ranking. The organizer can see each judge's mean and spread in
   the calibration table, and every score is audited.
-- **Not addressed.** Nothing detects two judges who agree suspiciously often, and outside
-  relationships (a judge who knows a team) are not modelled. Normalization damps a lone outlier
-  but does not stop two or three coordinating judges on a small panel.
+- **Detected.** The results screen's Panel integrity section (`GET /judging/integrity`,
+  `algorithms/integrity.ts`) lists judge pairs who scored three or more shared projects in lockstep
+  (identical totals, or a correlation of 0.95 and up over four or more), single ballots two standard
+  deviations away from the rest of the panel on the same project, flat judges, and judges assigned
+  a team where someone shares their organization. It flags; the organizer decides.
+- **Not addressed.** Relationships beyond a shared organization are not modelled, and on a small
+  panel two coordinating judges who vary their scores just enough can stay under every threshold.
 
 ### Deadline gaming
 

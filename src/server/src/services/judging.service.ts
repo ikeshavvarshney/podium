@@ -10,6 +10,7 @@ import {
   weightedTotal,
   type Criterion,
 } from "../algorithms/scoring.js";
+import { panelIntegrity } from "../algorithms/integrity.js";
 import { prisma } from "../db.js";
 import { badRequest, forbidden, notFound, unprocessable } from "../lib/errors.js";
 import type { AuthUser } from "../middleware/auth.js";
@@ -601,4 +602,54 @@ export async function clearUnscoredAssignments(ctx: EventContext, ipHash?: strin
   });
 
   return { removed: removable.length, kept: assignments.length - removable.length };
+}
+
+/**
+ * Things worth a question before results go out: judge pairs scoring in lockstep, ballots far from
+ * the rest of the panel on the same project, flat judges, and judges assigned a team that shares
+ * their organization. Nothing here changes a score.
+ */
+export async function getPanelIntegrity(ctx: EventContext) {
+  const [scores, assignments, judges] = await Promise.all([
+    prisma.judgeScore.findMany({
+      where: { eventId: ctx.event.id },
+      select: { judgeId: true, submissionId: true, weightedTotal: true },
+    }),
+    prisma.judgeAssignment.findMany({
+      where: { eventId: ctx.event.id },
+      select: {
+        judge: { select: { id: true, name: true, org: true } },
+        submission: { select: { id: true, name: true, team: { select: { members: { select: { user: { select: { org: true } } } } } } } },
+      },
+    }),
+    prisma.eventMembership.findMany({
+      where: { eventId: ctx.event.id, role: EventRole.JUDGE },
+      select: { user: { select: { id: true, name: true } } },
+    }),
+  ]);
+
+  const report = panelIntegrity(
+    scores.map((s) => ({ judgeId: s.judgeId, submissionId: s.submissionId, total: s.weightedTotal })),
+  );
+  const judgeName = new Map(judges.map((j) => [j.user.id, j.user.name]));
+  const submissionName = new Map(assignments.map((a) => [a.submission.id, a.submission.name]));
+  const orgOf = (org: string | null) => org?.trim().toLowerCase() || null;
+
+  const conflicts = assignments
+    .filter((a) => {
+      const org = orgOf(a.judge.org);
+      return org !== null && a.submission.team.members.some((m) => orgOf(m.user.org) === org);
+    })
+    .map((a) => ({ judge: a.judge.name, submission: a.submission.name, org: a.judge.org }));
+
+  return {
+    lockstep: report.lockstep.map((p) => ({ ...p, judgeA: judgeName.get(p.judgeA) ?? p.judgeA, judgeB: judgeName.get(p.judgeB) ?? p.judgeB })),
+    outliers: report.outliers.slice(0, 25).map((o) => ({
+      ...o,
+      judge: judgeName.get(o.judgeId) ?? o.judgeId,
+      submission: submissionName.get(o.submissionId) ?? o.submissionId,
+    })),
+    flat: report.flat.map((id) => judgeName.get(id) ?? id),
+    conflicts,
+  };
 }

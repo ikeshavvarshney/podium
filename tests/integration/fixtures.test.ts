@@ -109,6 +109,20 @@ describe("fixtures.json import and the acceptance checker probes", () => {
     expect(csv.text.split("\n")[0]).toContain(",");
   });
 
+  it("points the organizer at the fixture's flat judge, and keeps the report from judges", async () => {
+    const res = await get(`/api/events/${slug}/judging/integrity`, organizerId).expect(200);
+    expect(res.body.flat).toContain("Iva Petrova");
+    await get(`/api/events/${slug}/judging/integrity`, judgeA).expect(403);
+  });
+
+  it("scopes the checker's public tokens to the fixture event", async () => {
+    const other = await request(app)
+      .post("/api/events")
+      .set("Authorization", header(organizerId))
+      .send({ name: "Minted with a public token" });
+    expect(other.status).toBe(401);
+  });
+
   it("gives fixture accounts the same id on every import", () => {
     expect(stableUserId("Marek.Nowak@example.org")).toBe(judgeA);
     expect(judgeA).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);

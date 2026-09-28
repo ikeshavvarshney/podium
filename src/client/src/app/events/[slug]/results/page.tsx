@@ -41,6 +41,13 @@ interface Standing {
   lowSampleBallots?: number;
 }
 
+interface Integrity {
+  lockstep: Array<{ judgeA: string; judgeB: string; shared: number; identical: number; correlation: number | null; meanGap: number }>;
+  outliers: Array<{ judge: string; submission: string; deviation: number }>;
+  flat: string[];
+  conflicts: Array<{ judge: string; submission: string; org: string | null }>;
+}
+
 interface Preview {
   method: Method;
   comparative?: boolean;
@@ -92,6 +99,11 @@ export default function ResultsPage() {
   const [confirm, setConfirm] = useState<"publish" | "unpublish" | null>(null);
   const [understood, setUnderstood] = useState(false);
   const [byMethod, setByMethod] = useState<Partial<Record<Method, Preview>>>({});
+  const [integrity, setIntegrity] = useState<Integrity | null>(null);
+
+  useEffect(() => {
+    get<Integrity>(`/events/${slug}/judging/integrity`).then(setIntegrity).catch(() => setIntegrity(null));
+  }, [slug, published]);
 
   const load = useCallback(
     async (next: Method) => {
@@ -367,6 +379,47 @@ export default function ResultsPage() {
 
       {preview?.comparative ? null : (
         <>
+      {integrity ? (
+        <section aria-labelledby="integrity-title" className="mt-14">
+          <div className="border-b border-line pb-3.5">
+            <h2 id="integrity-title" className="m-0 text-heading font-semibold tracking-head">
+              Panel integrity
+            </h2>
+            <p className="mt-1.5 text-ui text-muted">
+              Questions worth asking before publishing. Nothing here changes a score.
+            </p>
+          </div>
+          {integrity.lockstep.length + integrity.outliers.length + integrity.flat.length + integrity.conflicts.length === 0 ? (
+            <p className="mt-3 text-ui text-muted">No judge pair scores in lockstep, no ballot sits far from its panel, and no conflicts of interest were found.</p>
+          ) : (
+            <ul className="m-0 mt-2 list-none p-0 text-ui">
+              {integrity.conflicts.map((c) => (
+                <li key={`c-${c.judge}-${c.submission}`} className="border-b border-line py-2.5">
+                  <span className="font-medium">Possible conflict:</span> {c.judge} is assigned {c.submission}, whose team includes someone from {c.org}.
+                </li>
+              ))}
+              {integrity.lockstep.map((p) => (
+                <li key={`l-${p.judgeA}-${p.judgeB}`} className="border-b border-line py-2.5">
+                  <span className="font-medium">In lockstep:</span> {p.judgeA} and {p.judgeB} shared {p.shared} projects
+                  {p.identical === p.shared ? " and gave identical totals on every one" : ` (correlation ${p.correlation?.toFixed(2)})`}.
+                </li>
+              ))}
+              {integrity.flat.map((name) => (
+                <li key={`f-${name}`} className="border-b border-line py-2.5">
+                  <span className="font-medium">Flat judge:</span> {name} gave every project the same score, so their ballots count as neutral.
+                </li>
+              ))}
+              {integrity.outliers.slice(0, 8).map((o) => (
+                <li key={`o-${o.judge}-${o.submission}`} className="border-b border-line py-2.5">
+                  <span className="font-medium">Far from the panel:</span> {o.judge} on {o.submission}, {Math.abs(o.deviation).toFixed(1)} standard deviations{" "}
+                  {o.deviation > 0 ? "above" : "below"} the other judges.
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
+
       <section aria-labelledby="agree-title" className="mt-14">
         <div className="border-b border-line pb-3.5">
           <h2 id="agree-title" className="m-0 text-heading font-semibold tracking-head">
