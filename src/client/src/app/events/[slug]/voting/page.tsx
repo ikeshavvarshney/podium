@@ -496,7 +496,7 @@ export default function VotingManagerPage() {
                 },
                 {
                   title: "Rate limiting",
-                  body: "Ballots are limited per hashed client address in a fixed window, in process. No Redis, so the platform still runs with the network off.",
+                  body: "Ballots are limited per hashed client address, open-link voting caps new voters per address per hour, and email-gated voters prove their address with a code. No Redis: limits live in the API or in Postgres.",
                 },
                 {
                   title: "Position bias",

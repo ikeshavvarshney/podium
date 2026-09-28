@@ -31,7 +31,8 @@ router.get(
         eventId: ctx.event.id,
         ...(req.query.action ? { action: String(req.query.action) } : {}),
       },
-      orderBy: { createdAt: "desc" },
+      // Chain order is insertion order, which a back-dated timestamp cannot disturb.
+      orderBy: [{ chainSeq: "desc" }, { createdAt: "desc" }],
       take: Number(req.query.take ?? 40),
       select: {
         id: true,

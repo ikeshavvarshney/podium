@@ -80,7 +80,7 @@ const MODES: Array<{ id: Method; label: string; explainer: string }> = [
 
 const METHOD_STEPS = [
   "Each judge scores every criterion; the server computes a weighted total from the stored rubric.",
-  "For each judge, the mean and standard deviation of their own evaluations are computed.",
+  "For each judge, the mean and standard deviation of their own evaluations are computed, then pulled toward the panel's in proportion to how few evaluations they cast.",
   "Every evaluation is restated as a distance from that judge's own mean, in their own units.",
   "A project's normalized score is the mean of the standardized evaluations it received.",
   "Projects are re-ranked on that score, and the movement against the raw rank is shown.",
@@ -578,14 +578,17 @@ export default function ResultsPage() {
             ))}
           </ol>
           <div className="mt-[22px] rounded-[10px] border border-line bg-elevated px-4 py-3.5 font-mono text-small leading-[1.8]">
-            z = (x &minus; &mu;<sub>j</sub>) / &sigma;<sub>j</sub>
+            &mu;*<sub>j</sub> = (n<sub>j</sub>&mu;<sub>j</sub> + 1&middot;&mu;) / (n<sub>j</sub> + 1)
             <br />
-            display = 50 + 10z
+            &sigma;*<sub>j</sub>&sup2; = (n<sub>j</sub>&sigma;<sub>j</sub>&sup2; + 3&middot;&sigma;&sup2;<sub>pool</sub>) / (n<sub>j</sub> + 3)
+            <br />
+            z = (x &minus; &mu;*<sub>j</sub>) / &sigma;*<sub>j</sub>, display = 50 + 10z
           </div>
           <p className="mt-4 text-small leading-[1.6] text-muted">
-            A judge whose evaluations have no spread leaves the standard deviation undefined.
-            Those evaluations contribute zero rather than being treated as extreme, and the ballot
-            count is shown next to every standing so thin coverage stays visible.
+            A judge with one or two evaluations is read mostly on the panel&apos;s scale, so a single
+            ballot can neither vanish nor swing a ranking. A judge whose evaluations have no spread
+            contributes zero, and the ballot count is shown next to every standing so thin coverage
+            stays visible.
           </p>
         </div>
       </section>
