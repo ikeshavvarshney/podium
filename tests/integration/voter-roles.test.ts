@@ -49,7 +49,7 @@ describe("who may vote, by role", () => {
 
   beforeAll(async () => {
     await resetDatabase();
-    rateLimitStore.reset();
+    await rateLimitStore.reset();
     organizer = await createOrganizer("Organizer");
     alice = await createUser({ name: "Alice" });
     bob = await createUser({ name: "Bob" });

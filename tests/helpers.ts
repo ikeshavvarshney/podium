@@ -9,6 +9,7 @@ export const app: Express = createApp();
 const TABLES = [
   "api_tokens",
   "webhook_outbox",
+  "rate_limit_buckets",
   "webhook_deliveries",
   "webhooks",
   "criterion_scores",

@@ -47,7 +47,7 @@ describe("community voting", () => {
 
   beforeAll(async () => {
     await resetDatabase();
-    rateLimitStore.reset();
+    await rateLimitStore.reset();
 
     organizer = await createOrganizer("Organizer");
     alice = await createUser({ name: "Alice" });

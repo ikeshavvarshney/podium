@@ -5,7 +5,14 @@ import { prisma } from "../db.js";
 import { asyncHandler } from "../lib/async-handler.js";
 import { forbidden } from "../lib/errors.js";
 import { currentUser, requireAuth } from "../middleware/auth.js";
-import { authRateLimit } from "../middleware/rate-limit.js";
+import {
+  assertLoginAllowed,
+  authRateLimit,
+  clearLoginFailures,
+  rateLimit,
+  recordLoginFailure,
+} from "../middleware/rate-limit.js";
+import { AppError } from "../lib/errors.js";
 import { validate } from "../middleware/validate.js";
 import { createApiToken, listApiTokens, revokeApiToken } from "../services/api-token.service.js";
 import { AuditAction, recordAuditSafe } from "../services/audit.service.js";
@@ -69,7 +76,12 @@ router.post(
   authRateLimit,
   validate({ body: loginSchema }),
   asyncHandler(async (req, res) => {
-    const { user } = await loginUser(req.body.email, req.body.password, req.ipHash);
+    await assertLoginAllowed(req.body.email, req.ipHash, res);
+    const { user } = await loginUser(req.body.email, req.body.password, req.ipHash).catch(async (err) => {
+      if (err instanceof AppError && err.status === 401) await recordLoginFailure(req.body.email, req.ipHash);
+      throw err;
+    });
+    await clearLoginFailures(req.body.email, req.ipHash);
     const token = await openSession(user.id, req);
     res.cookie(AUTH_COOKIE, token, sessionCookieOptions());
     res.json({ user, token });
@@ -81,9 +93,17 @@ router.post(
  * registered, and with no mail transport configured the operator collects the
  * link from the server log.
  */
+const magicLinkPerAddress = rateLimit("magic-link", {
+  windowMs: 15 * 60_000,
+  max: 5,
+  key: (req) => String(req.body?.email ?? "").trim().toLowerCase(),
+  message: "A sign-in link was requested for this address several times. Try again in a few minutes.",
+});
+
 router.post(
   "/magic-link",
   authRateLimit,
+  magicLinkPerAddress,
   validate({ body: z.object({ email: z.string().trim().email("Enter a valid email address.") }) }),
   asyncHandler(async (req, res) => {
     const issued = await issueSignInToken(req.body.email, req.ipHash);

@@ -159,7 +159,7 @@ export async function attemptDelivery(outboxId: string): Promise<void> {
     async (tx) => {
       const claimed = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT "id" FROM "webhook_outbox"
-        WHERE "id" = ${outboxId}::uuid AND "status" = 'PENDING' AND "next_attempt_at" <= now()
+        WHERE "id" = ${outboxId}::uuid AND "status" = 'PENDING' AND "next_attempt_at" <= (now() AT TIME ZONE 'UTC')
         FOR UPDATE SKIP LOCKED`;
       if (claimed.length === 0) return;
 

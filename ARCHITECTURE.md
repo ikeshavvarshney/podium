@@ -156,10 +156,17 @@ investigation without becoming a pile of personal data.
 
 ## Rate limiting
 
-A fixed-window counter in process memory, keyed by hashed IP. Deliberately not Redis:
-the platform must run as a single API container with the network off, and an extra
-stateful service to throttle a hackathon portal is not a trade worth making. The cost is
-that limits are per-container.
+Fixed-window counters, keyed by hashed IP or by account. They live in process memory by
+default, which is right for the single API container compose starts. With
+`RATE_LIMIT_STORE=postgres` the same windows live in `rate_limit_buckets` (one upsert per
+hit), so any number of replicas share them without adding Redis: the database the platform
+already needs is the shared store.
+
+Sign-in counts failures, not attempts. A venue puts hundreds of people behind one NAT
+address, so the per-address ceiling on all authentication traffic is generous (300 per 15
+minutes), and the tight limits apply only to failures: 10 per account per address, and 50 per
+address across accounts. Keying the account limit on the address as well means an attacker
+elsewhere cannot lock a real user out, and a successful sign-in clears the count.
 
 The client IP comes from the socket unless `TRUST_PROXY` says a proxy sits in front. The
 compose file publishes the API directly, so trusting `X-Forwarded-For` there would let any

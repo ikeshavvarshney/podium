@@ -201,9 +201,8 @@ Claimed honestly in `.dogfood.toml`: T1, T2, T3 and T4. The acceptance checker o
   links are written to the API log for the operator to relay, and email-gated voting does
   not verify that the address belongs to the voter. Accounts created by a roster import
   sign in by link, so they depend on that relay too.
-- Rate limiting is in-process, so it is per-container rather than per-cluster. That is a
-  deliberate trade to avoid a Redis dependency; see [docs/SECURITY.md](docs/SECURITY.md).
-  Behind a reverse proxy, set `TRUST_PROXY` (a hop count or the proxy's address) so limits
+- Rate limits live in process memory by default. Running more than one API replica, set
+  `RATE_LIMIT_STORE=postgres` to share them through the database. Behind a reverse proxy, set `TRUST_PROXY` (a hop count or the proxy's address) so limits
   key on the real client; left unset, `X-Forwarded-For` is ignored because a client could forge it.
 - `npm audit` reports five advisories in `src/server` (the client has none): Vitest's UI server (dev only, never started) and the Prisma CLI's `deepmerge-ts`, which ships in the image only to run migrations at boot and is never fed request data. Fixing them needs major upgrades of Prisma and Vitest, which are not done.
 

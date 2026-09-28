@@ -17,7 +17,7 @@ describe("passwordless sign-in links", () => {
 
   beforeAll(async () => {
     await resetDatabase();
-    rateLimitStore.reset();
+    await rateLimitStore.reset();
     alice = await createUser({ name: "Alice" });
   });
 

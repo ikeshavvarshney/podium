@@ -73,7 +73,7 @@ question is always re-derived from the session and a fresh database lookup.
 | **Tampering** | Client submits a `weightedTotal`, a vote `credits` figure, or a normalization result. | All of these are computed server-side from stored inputs and never accepted from the client. See `JUDGING.md` section 1 and 9. |
 | **Repudiation** | An organizer denies publishing results, or a judge denies a score they cast. | `audit_logs` with actor, action, target and timestamp, append-only by database trigger and hash-chained so a rewrite is detectable. `normalization_runs` snapshots the exact inputs behind a published result. |
 | **Information disclosure** | Judge A reads Judge B's scores. A participant reads a private event they are not a member of. A voter's identity leaks to another participant. | Every event-scoped query is filtered by the caller's own `event_memberships` row, derived server-side (see `API.md`'s worked example). Private events 404 rather than 403 for non-members. `voterKey` never appears in a response to another participant. |
-| **Denial of service** | Vote or login flooding from one client. | Fixed-window rate limiting by hashed IP. The IP is the socket address unless `TRUST_PROXY` names a proxy, so a forged `X-Forwarded-For` cannot mint fresh IPs. Explicitly not a defense against a distributed attacker; see limits below. |
+| **Denial of service** | Vote or login flooding from one client. | Fixed-window rate limiting by hashed IP, and failed sign-ins by account and IP. The IP is the socket address unless `TRUST_PROXY` names a proxy, so a forged `X-Forwarded-For` cannot mint fresh IPs. Explicitly not a defense against a distributed attacker; see limits below. |
 | **Elevation of privilege** | A participant calls a judge or organizer endpoint directly. | Middleware chain (`requireAuth` -> `loadEventContext` -> `requireJudge` / `requireEventAdmin`) runs before every handler; there is no code path that reaches a handler without it. Tested with `curl`-equivalent Supertest calls using a real, valid, wrong-role session, not by hiding a button. |
 
 ## Worked scenarios
@@ -196,9 +196,10 @@ that backs the claim.
 Stated plainly, per `CLAUDE.md`'s instruction to be honest about tier boundaries rather
 than claim coverage the code does not have.
 
-- **Rate limiting is per-process, in memory.** A horizontally scaled deployment would
-  need a shared counter (Redis or equivalent), which the brief explicitly forbids as a
-  runtime dependency. Documented trade-off, not an oversight: see `ARCHITECTURE.md`.
+- **Rate limiting is per-process by default.** A horizontally scaled deployment sets
+  `RATE_LIMIT_STORE=postgres` so replicas share windows through the database, with no Redis.
+  Sign-in limits count failures per account and address, so a crowded venue behind one NAT
+  address is not locked out; see `ARCHITECTURE.md`.
 - **Email-gated and open-link voting do not prove identity.** Neither mode defends
   against a determined attacker with several addresses or IPs. The honest recommendation
   for anything that decides a prize is `AUTHENTICATED` voting; see `JUDGING.md` section 9.

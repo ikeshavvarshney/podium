@@ -32,6 +32,8 @@ const EnvSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((v) => v === "true"),
+  /** Where rate-limit windows live: this process, or Postgres so every replica shares them. */
+  RATE_LIMIT_STORE: z.enum(["memory", "postgres"]).default("memory"),
   SEED_ON_BOOT: z
     .enum(["true", "false"])
     .default("false")
