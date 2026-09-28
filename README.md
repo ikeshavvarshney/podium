@@ -68,6 +68,28 @@ The seed also creates one event per state so every screen has data: `harbor-hack
 The judge and admin roles are not sign-in choices. They are grants an organizer makes
 per event, which is the point of the permission model below.
 
+### Configuration
+
+Every setting has a working default in `docker-compose.yml`; `.env.example` documents each one.
+The ones that matter before a real event:
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `SEED_ON_BOOT` | `true` | Seeds demo events and accounts (shared public password) and imports `fixtures.json`. Set `false` for a real event. |
+| `FIXTURE_TOKENS` | `true` | Issues the acceptance checker's public tokens, scoped to the fixture event only. |
+| `JWT_SECRET`, `RECORD_SIGNING_SECRET` | generated | Empty means the API generates both on first boot and keeps them in the database. Set them to manage secrets yourself (32+ characters). |
+| `COOKIE_SECURE` | `false` | Set `true` behind HTTPS. |
+| `PUBLIC_WEB_URL`, `PUBLIC_API_URL`, `CORS_ORIGIN`, `NEXT_PUBLIC_API_URL` | localhost | Where browsers reach the web client and the API. |
+| `TRUST_PROXY` | `false` | Behind a reverse proxy, a hop count or the proxy's address, so limits key on the real client. |
+| `SMTP_URL`, `MAIL_FROM` | empty | Mail server for sign-in links and voting codes. Empty keeps the platform offline: messages go to the API log. |
+| `RATE_LIMIT_STORE` | `memory` | `postgres` shares rate limits across several API replicas. |
+| `WEBHOOK_ALLOW_PRIVATE` | `false` | Local development only: lets webhooks reach private and loopback addresses. |
+
+Moving an event between instances: download **Exports > event.json** (or
+`docker compose exec server node dist/scripts/event-transfer.js export <slug> > event.json`) and
+import it from **My events > Import event**, `POST /api/events/import`, or
+`docker compose exec server node dist/scripts/event-transfer.js import event.json --owner you@example.org`.
+
 ## Develop locally
 
 ```bash

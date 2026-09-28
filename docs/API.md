@@ -91,7 +91,8 @@ flowchart LR
 | `/board`, `/board/requests` | Team-looking-for-people and people-looking-for-a-team listings, and the join-request handshake. |
 | `/rounds`, `/faq` | Organizer-authored event timeline and FAQ. |
 | `/updates`, `/updates/:id/read`, `/updates/read-all` | Announcements and per-user read receipts. |
-| `/audit` | Organizer-only read of the event's audit trail. |
+| `/audit` | Organizer-only read of the event's audit trail, newest first in chain order; `?action=` filters, `?take=` up to 200. |
+| `/audit/verify` | Organizer-only. Recomputes the event's audit hash chain in the database and returns `{ ok, entries, head, firstBreak }`. |
 | `/export/*.csv`, `/export/event.json` | Organizer-only. Submissions, teams, judges, scores, results, audit, or the whole event in the portable transfer format. |
 
 ### Judging (mounted at `/events/:eventId`)
@@ -101,13 +102,14 @@ flowchart LR
 | GET / PUT | `/rubric` | Locks once scoring starts (`locked_at`). |
 | GET / POST / DELETE | `/assignments`, `/assignments/generate` | Manual and algorithmic assignment; the algorithm is a pure function, tested without HTTP. |
 | GET | `/progress` | Coverage dashboard: started, complete, per-submission review count. |
+| GET | `/judging/integrity` | Organizer-only panel checks: judge pairs scoring in lockstep, outlier ballots, flat judges, same-organization conflicts. Flags only; nothing changes a score. |
 | GET | `/judge/queue`, `/judge/scores/:submissionId` | **Scoped to the caller.** A judge id in the query string is never trusted; the server derives whose queue this is from the session. |
 | PUT | `/judge/scores/:submissionId` | The weighted total is computed server-side from the stored rubric; a client-supplied total is ignored. |
 | GET / POST | `/judge/groups`, `/judge/rankings` | Comparative mode: fetch this judge's groups, submit an order for one. |
 | GET | `/rankings/standings` | Live Borda standings, organizer-only. |
 | GET | `/judge/record` | The judge's own signed participation record. |
 | GET | `/scores` | Organizer-only aggregate view. There is no `judgeId` parameter to trust or ignore: a non-organizer caller gets `403` regardless of what the query string says. |
-| GET / POST | `/results/preview`, `/results/normalize`, `/results/runs`, `/results/publish`, `/results` | Normalization is a POST that creates an immutable `normalization_runs` row; reading a result is always from a stored run, never a live recomputation. |
+| GET / POST | `/results/preview`, `/results/normalize`, `/results/runs`, `/results/publish`, `/results` | Normalization is a POST that creates an immutable `normalization_runs` row carrying a digest of the ballots it read; reading a result is always from a stored run, never a live recomputation. `runs` marks each run `current` (ballots unchanged since) and `published`. `publish` takes `{ publish, runId? }`, pins that run (the newest by default), refuses with `409` a run the ballots no longer match, and freezes ballots until unpublished. Comparative events rank by Bradley-Terry, with Borda as the raw column. |
 
 ### Voting (mounted at `/events/:eventId`)
 
@@ -116,7 +118,7 @@ flowchart LR
 | GET / PUT | `/voting/config` | Access mode, method, credit budget, result hiding, and who may vote (`allowVisitors`, `allowParticipants`, `allowJudges`, `allowAdmins`; at least one must stay true). |
 | GET | `/voting/ballot` | A shuffled, per-voter-stable ballot order. Sets the open-link device cookie. |
 | POST | `/voting/verify`, `/voting/verify/confirm` | Email-gated voting: send a six-digit code, then trade it for a voter token (returned and set as a cookie; scripts send it as `x-voter-token`). |
-| POST | `/votes` | Priced and validated server-side; see `JUDGING.md` for the quadratic-voting cost function. |
+| POST | `/votes` | Priced and validated server-side; see `JUDGING.md` for the quadratic-voting cost function and the `maxChoices` limit. Email-gated events need a voter token (`x-voter-token` or the cookie); open-link voters are identified by a browser cookie and capped per address per hour (`429`). |
 | GET | `/votes/ballots`, `/votes/results` | Organizer-only while `hideResults` is set and the window is open. |
 
 ### Integrations (mounted at `/events/:eventId`)

@@ -102,12 +102,15 @@ erDiagram
 | `users` | Accounts. `password_hash` is Argon2id. `token_version` enables revoking every session at once. |
 | `sessions` | One row per signed-in device: user agent, hashed IP, `last_seen_at`, `revoked_at`. Lets a JWT be tied to a single device without a global session table for every request. |
 | `sign_in_tokens` | Single-use, hashed-at-rest tokens behind passwordless sign-in. |
+| `api_tokens` | Bearer tokens for scripts (`pod_...`), stored as a SHA-256 hash with a short display prefix. `event_id`, when set, confines a token to one event, where it acts as its owner without the organizer capability. Revoked by `revoked_at`, never deleted, so the audit trail still points at something. |
+| `instance_secrets` | The session and record-signing secrets, generated on first boot so no instance runs on a secret published in the repository. Environment variables override them. |
+| `rate_limit_buckets` | Fixed-window counters shared by every API replica when `RATE_LIMIT_STORE=postgres`. |
 
 ### Events
 
 | Table | Purpose |
 | --- | --- |
-| `events` | The unit of scope. Owns the full timeline; every deadline check reads these columns. |
+| `events` | The unit of scope. Owns the full timeline; every deadline check reads these columns. `published_run_id` pins the normalization run the public sees, so a later run never changes published standings. |
 | `event_memberships` | The authorization spine, described above. |
 | `tracks` | Categories within an event. `restricted` marks tracks that require an explicit judge scope. |
 | `prizes` | Optionally attached to a track. |
@@ -140,16 +143,17 @@ erDiagram
 | `judge_assignments` | Unique per `(judge, submission)`, so a judge is never assigned the same project twice. `position` is randomized to blunt order bias. |
 | `judge_scores` | One ballot per `(judge, submission)`. `weighted_total` is computed server-side and never accepted from a client. |
 | `criterion_scores` | The per-criterion values behind a ballot, so any total can be re-derived. |
-| `normalization_runs` | An immutable snapshot: method, per-judge statistics, parameters, ballot count. |
+| `normalization_runs` | An immutable snapshot: method, per-judge statistics (including the shrunk mean and spread), parameters, ballot count, and `ballot_digest`, a SHA-256 over every ballot it read. Publication is refused once the ballots no longer hash to that value. |
 | `normalized_scores` | Per-submission results for one run, with both raw and normalized ranks. |
-| `pairwise_rankings` | One row per judge per comparative group: the `order` of submission ids that judge placed best to worst. Input to the Borda count; see `JUDGING.md`. |
+| `pairwise_rankings` | One row per judge per comparative group: the `order` of submission ids that judge placed best to worst. Input to the Bradley-Terry fit and the Borda count; see `JUDGING.md`. |
 
 ### Public participation
 
 | Table | Purpose |
 | --- | --- |
-| `voting_configs` | Per event: access mode, method, credit budget, result hiding, ballot shuffling, and which roles may vote (visitors, participants, judges, admins). |
-| `votes` | One line per voter per project: weight, credits spent, hashed IP and user agent. Unique per `(event, submission, voter_key)`, so duplicate detection is a database constraint, not application code. `voter_key` is always derived server-side from the session, the gated address or the hashed client IP. |
+| `voting_configs` | Per event: access mode, method, credit budget, `max_choices` (how many projects one voter may back under single voting; 1 is one vote per person), `max_votes_per_ip_per_hour` (new open-link voters one address may add), result hiding, ballot shuffling, and which roles may vote (visitors, participants, judges, admins). Method, budget and choice limit lock once ballots exist. |
+| `voter_verifications` | Email-gated voting: a hashed six-digit code with an expiry and attempt count, then, once confirmed, the hash of the voter token that proves the address on later ballots. |
+| `votes` | One line per voter per project: weight, credits spent, hashed IP and user agent. Unique per `(event, submission, voter_key)`, so duplicate detection is a database constraint, not application code. `voter_key` is always derived server-side: `user:` from the session, `email:` from a verified address, `device:` from the open-link browser cookie. |
 | `comments` | Soft-hidden via `hidden_at` rather than deleted, so moderation stays auditable. |
 
 ### Operations
