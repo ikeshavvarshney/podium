@@ -33,7 +33,7 @@ function SignedRecordCard({ record, slug }: { record: SignedRecord; slug: string
         Signed participation record
       </h2>
       <p className="mt-2 text-small leading-[1.6] text-muted">
-        The judging window for {record.payload.event.name} is closed. Here is a dated, cryptographically signed attestation of
+        Judging for {record.payload.event.name} is finished. Here is a dated, cryptographically signed attestation of
         the projects you scored: publicly verifiable, not just a certificate image. It names what you reviewed, never the scores
         you gave.
       </p>
@@ -510,7 +510,9 @@ export default function JudgeConsolePage() {
         <span className="font-mono text-small text-muted">
           {queue.completed} of {total} submitted
         </span>
-        {closesAt ? (
+        {!queue.window.open && !pastClose ? (
+          <span className="rounded-[5px] px-2 py-1 font-mono text-meta leading-[1.5] text-muted">Judging closed</span>
+        ) : closesAt ? (
           <span
             className={`rounded-[5px] px-2 py-1 font-mono text-meta leading-[1.5] ${urgent ? "bg-warning-soft text-warning-text" : "text-muted"}`}
           >

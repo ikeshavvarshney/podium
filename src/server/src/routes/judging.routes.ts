@@ -134,6 +134,7 @@ router.post(
   requireAuth,
   asyncHandler(loadEventContext),
   requireEventAdmin,
+  writeRateLimit,
   validate({
     body: z.object({ judgeId: z.string().uuid(), submissionId: z.string().uuid() }),
   }),
@@ -269,10 +270,6 @@ router.post(
   }),
 );
 
-/**
- * Aggregate scores are organizer-only. A judge hitting this gets 403 even for
- * an event they judge, which is the boundary the whole product turns on.
- */
 // ----------------------------------------------------------------
 // Comparative ranking (an alternative to rubric scoring)
 // ----------------------------------------------------------------
@@ -345,6 +342,7 @@ router.get(
   }),
 );
 
+/** Aggregate scores are organizer-only, even for a judge on this event. */
 router.get(
   "/scores",
   requireAuth,
@@ -427,9 +425,9 @@ router.post(
   requireAuth,
   asyncHandler(loadEventContext),
   requireEventAdmin,
-  validate({ body: z.object({ publish: z.boolean() }) }),
+  validate({ body: z.object({ publish: z.boolean(), runId: z.string().uuid().optional() }) }),
   asyncHandler(async (req, res) => {
-    res.json(await publishResults(eventContext(req), req.body.publish, req.ipHash));
+    res.json(await publishResults(eventContext(req), req.body.publish, req.ipHash, req.body.runId));
   }),
 );
 

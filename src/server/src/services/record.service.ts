@@ -27,6 +27,14 @@ function digest(payload: unknown): string {
   return createHash("sha256").update(canonicalize(payload)).digest("hex");
 }
 
+/** The earlier of the scheduled close and publication, ignoring dates still in the future. */
+function closedAt(closesAt: Date | null, publishedAt: Date | null): Date | null {
+  const now = Date.now();
+  const candidates = [closesAt, publishedAt].filter((d): d is Date => d !== null && d.getTime() <= now);
+  if (candidates.length === 0) return null;
+  return candidates.reduce((a, b) => (a < b ? a : b));
+}
+
 /**
  * A judge's dated attestation of the projects they evaluated. It is issued only
  * once judging has closed, because a record of an unfinished queue would
@@ -66,7 +74,7 @@ export async function buildJudgeRecord(ctx: EventContext, judgeId: string): Prom
     event: {
       slug: ctx.event.slug,
       name: ctx.event.name,
-      judgingClosedAt: closesAt ? closesAt.toISOString() : null,
+      judgingClosedAt: closedAt(closesAt, ctx.event.resultsPublishedAt)?.toISOString() ?? null,
     },
     judge: { id: judge.id, name: judge.name, org: judge.org },
     reviewed: scores.map((s) => s.submissionId),

@@ -1,16 +1,69 @@
 import { JudgingMode, NormalizationMethod, SubmissionStatus } from "@prisma/client";
+import { createHash } from "node:crypto";
 import { bordaCount } from "../algorithms/pairwise.js";
 import { displayZ, normalize } from "../algorithms/normalization.js";
 import { prisma } from "../db.js";
-import { forbidden, notFound } from "../lib/errors.js";
+import { conflict, forbidden, notFound } from "../lib/errors.js";
+import { canonicalize } from "../lib/signing.js";
 import { AuditAction, recordAudit } from "./audit.service.js";
 import type { EventContext } from "./authorization.service.js";
+
+/** Fingerprint of every input a ranking depends on: ballots, rankings and which entries count. */
+export async function ballotDigest(eventId: string): Promise<string> {
+  const [scores, rankings, submitted] = await Promise.all([
+    prisma.judgeScore.findMany({
+      where: { eventId },
+      select: {
+        judgeId: true,
+        submissionId: true,
+        weightedTotal: true,
+        criterionScores: { select: { criterionId: true, value: true }, orderBy: { criterionId: "asc" } },
+      },
+      orderBy: [{ judgeId: "asc" }, { submissionId: "asc" }],
+    }),
+    prisma.pairwiseRanking.findMany({
+      where: { eventId },
+      select: { judgeId: true, groupKey: true, order: true, skipped: true },
+      orderBy: [{ judgeId: "asc" }, { groupKey: "asc" }],
+    }),
+    prisma.submission.findMany({
+      where: { eventId, status: SubmissionStatus.SUBMITTED },
+      select: { id: true },
+      orderBy: { id: "asc" },
+    }),
+  ]);
+  return createHash("sha256")
+    .update(canonicalize({ scores, rankings, submitted: submitted.map((s) => s.id) }))
+    .digest("hex");
+}
+
+async function latestRunState(ctx: EventContext, digest: string) {
+  const latest = await prisma.normalizationRun.findFirst({
+    where: { eventId: ctx.event.id },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, method: true, createdAt: true, ballotDigest: true },
+  });
+  if (!latest) return null;
+  return {
+    id: latest.id,
+    method: latest.method,
+    createdAt: latest.createdAt,
+    current: latest.ballotDigest === digest,
+    published: ctx.event.publishedRunId === latest.id,
+  };
+}
 
 /**
  * Computes a ranking without storing it. Used for the organizer preview, so
  * switching method does not litter the audit trail with runs.
  */
 export async function previewResults(ctx: EventContext, method: NormalizationMethod) {
+  const digest = await ballotDigest(ctx.event.id);
+  const [preview, latestRun] = await Promise.all([computePreview(ctx, method), latestRunState(ctx, digest)]);
+  return { ...preview, ballotDigest: digest, latestRun };
+}
+
+async function computePreview(ctx: EventContext, method: NormalizationMethod) {
   const rubric = await prisma.rubric.findUnique({ where: { eventId: ctx.event.id }, select: { mode: true } });
   if (rubric?.mode === JudgingMode.COMPARATIVE) return previewComparative(ctx, method);
 
@@ -133,6 +186,7 @@ export async function runNormalization(
       eventId: ctx.event.id,
       method,
       ballotCount: preview.ballotCount,
+      ballotDigest: preview.ballotDigest,
       judgeStats: preview.judgeStats,
       parameters: {
         comparative: preview.comparative,
@@ -161,7 +215,7 @@ export async function runNormalization(
     targetType: "normalization_run",
     targetId: run.id,
     summary: `Normalization run (${method}) over ${preview.ballotCount} ballots`,
-    metadata: { method, ballotCount: preview.ballotCount },
+    metadata: { method, ballotCount: preview.ballotCount, ballotDigest: preview.ballotDigest },
     ipHash,
   });
 
@@ -169,17 +223,26 @@ export async function runNormalization(
 }
 
 export async function listRuns(ctx: EventContext) {
-  return prisma.normalizationRun.findMany({
-    where: { eventId: ctx.event.id },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      method: true,
-      ballotCount: true,
-      createdAt: true,
-      _count: { select: { scores: true } },
-    },
-  });
+  const [runs, digest] = await Promise.all([
+    prisma.normalizationRun.findMany({
+      where: { eventId: ctx.event.id },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        method: true,
+        ballotCount: true,
+        ballotDigest: true,
+        createdAt: true,
+        _count: { select: { scores: true } },
+      },
+    }),
+    ballotDigest(ctx.event.id),
+  ]);
+  return runs.map((run) => ({
+    ...run,
+    current: run.ballotDigest === digest,
+    published: ctx.event.publishedRunId === run.id,
+  }));
 }
 
 export async function getRun(ctx: EventContext, runId: string) {
@@ -200,15 +263,27 @@ export async function getRun(ctx: EventContext, runId: string) {
   return run;
 }
 
-export async function publishResults(ctx: EventContext, publish: boolean, ipHash?: string) {
+/**
+ * Pins one run (the newest unless `runId` is given) as the public result. A run whose digest no
+ * longer matches the ballots is refused. Publishing freezes ballots; unpublishing reopens them.
+ */
+export async function publishResults(ctx: EventContext, publish: boolean, ipHash?: string, runId?: string) {
+  let run: { id: string; method: NormalizationMethod; ballotDigest: string | null } | null = null;
   if (publish) {
-    const latest = await prisma.normalizationRun.findFirst({
-      where: { eventId: ctx.event.id },
+    run = await prisma.normalizationRun.findFirst({
+      where: { eventId: ctx.event.id, ...(runId ? { id: runId } : {}) },
       orderBy: { createdAt: "desc" },
-      select: { id: true },
+      select: { id: true, method: true, ballotDigest: true },
     });
-    if (!latest) {
+    if (!run) {
+      if (runId) throw notFound("Normalization run not found.");
       throw forbidden("Run normalization before publishing results.");
+    }
+    if (run.ballotDigest !== (await ballotDigest(ctx.event.id))) {
+      throw conflict(
+        "Ballots have changed since this normalization run. Run normalization again, then publish the new run.",
+        { runId: run.id },
+      );
     }
   }
 
@@ -217,6 +292,7 @@ export async function publishResults(ctx: EventContext, publish: boolean, ipHash
     data: {
       resultsPublished: publish,
       resultsPublishedAt: publish ? new Date() : null,
+      publishedRunId: run?.id ?? null,
       ...(publish ? { status: "RESULTS_PUBLISHED" as const } : {}),
     },
   });
@@ -225,9 +301,12 @@ export async function publishResults(ctx: EventContext, publish: boolean, ipHash
     action: AuditAction.RESULTS_PUBLISHED,
     eventId: ctx.event.id,
     actorId: ctx.user?.id ?? null,
-    targetType: "event",
-    targetId: ctx.event.id,
-    summary: publish ? "Results published" : "Results unpublished",
+    targetType: run ? "normalization_run" : "event",
+    targetId: run?.id ?? ctx.event.id,
+    summary: run
+      ? `Results published from the ${run.method} run; ballots are frozen`
+      : "Results unpublished; judges may change ballots again",
+    metadata: run ? { runId: run.id, method: run.method, ballotDigest: run.ballotDigest } : {},
     ipHash,
   });
 
@@ -241,7 +320,7 @@ export async function getPublishedResults(ctx: EventContext) {
   }
 
   const run = await prisma.normalizationRun.findFirst({
-    where: { eventId: ctx.event.id },
+    where: ctx.event.publishedRunId ? { id: ctx.event.publishedRunId } : { eventId: ctx.event.id },
     orderBy: { createdAt: "desc" },
     include: {
       scores: {
@@ -264,6 +343,7 @@ export async function getPublishedResults(ctx: EventContext) {
   if (!run) throw notFound("No results have been computed yet.");
 
   return {
+    runId: run.id,
     method: run.method,
     comparative: (run.parameters as { comparative?: boolean } | null)?.comparative === true,
     computedAt: run.createdAt,

@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import { badRequest, conflict, forbidden } from "../lib/errors.js";
 import { AuditAction, recordAudit } from "./audit.service.js";
 import type { EventContext } from "./authorization.service.js";
+import { assertJudgingOpen } from "./judging.service.js";
 import { requireRubric } from "./rubric.service.js";
 
 const submissionCard = {
@@ -76,6 +77,7 @@ export async function submitRanking(
   input: { order: string[]; skipped?: boolean },
   ipHash?: string,
 ) {
+  assertJudgingOpen(ctx);
   await assertComparativeMode(ctx.event.id);
 
   if (new Set(input.order).size !== input.order.length) {

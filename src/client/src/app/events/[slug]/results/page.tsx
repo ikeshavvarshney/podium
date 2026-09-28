@@ -538,7 +538,7 @@ export default function ResultsPage() {
       >
         <p className="m-0">
           This runs the <span className="font-medium text-text">{active.label}</span> normalization on {preview?.ballotCount ?? 0} evaluation
-          {preview?.ballotCount === 1 ? "" : "s"} from {judgesWithBallots} judge{judgesWithBallots === 1 ? "" : "s"}, then makes the standings public. You can withdraw them afterwards, but anyone who has seen them has seen them.
+          {preview?.ballotCount === 1 ? "" : "s"} from {judgesWithBallots} judge{judgesWithBallots === 1 ? "" : "s"}, then makes the standings public and freezes every ballot. You can withdraw them afterwards, but anyone who has seen them has seen them.
         </p>
         {incomplete ? (
           <div className="mt-3 rounded-[10px] bg-warning-soft px-3.5 py-3 text-small text-warning-text">
@@ -579,7 +579,7 @@ export default function ResultsPage() {
         onConfirm={() => void runAndPublish(false)}
         onCancel={() => setConfirm(null)}
       >
-        <p className="m-0">The public standings and the winners page will disappear. The stored normalization run is kept, and you can publish again later.</p>
+        <p className="m-0">The public standings and the winners page will disappear. The stored normalization run is kept, judges can change their ballots again, and you can publish again later.</p>
       </ConfirmDialog>
     </main>
   );

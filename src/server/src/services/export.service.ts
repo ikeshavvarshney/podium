@@ -2,14 +2,12 @@ import { prisma } from "../db.js";
 import type { EventContext } from "./authorization.service.js";
 
 /**
- * RFC 4180 quoting. Text starting with =, +, -, @, tab or carriage return is prefixed with a
- * single quote so spreadsheet software does not execute it as a formula. Numbers are written
- * as they are: -1 is a value, and quoting it would turn a numeric column into text.
+ * RFC 4180 quoting. Text starting with =, +, -, @, tab or CR gets a leading quote so spreadsheets
+ * do not run it as a formula; numbers are left as numbers.
  */
 function cell(value: unknown): string {
   if (value === null || value === undefined) return "";
   let text = String(value);
-  // A formatted number such as (-0.5).toFixed(4) arrives as a string, and is still a number.
   const numeric =
     (typeof value === "number" && Number.isFinite(value)) || /^-?\d+(\.\d+)?$/.test(text);
   if (!numeric && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
@@ -161,8 +159,9 @@ export async function exportScores(ctx: EventContext): Promise<string> {
 }
 
 export async function exportResults(ctx: EventContext, runId?: string): Promise<string> {
-  const run = runId
-    ? await prisma.normalizationRun.findFirst({ where: { id: runId, eventId: ctx.event.id } })
+  const pinned = runId ?? ctx.event.publishedRunId;
+  const run = pinned
+    ? await prisma.normalizationRun.findFirst({ where: { id: pinned, eventId: ctx.event.id } })
     : await prisma.normalizationRun.findFirst({
         where: { eventId: ctx.event.id },
         orderBy: { createdAt: "desc" },

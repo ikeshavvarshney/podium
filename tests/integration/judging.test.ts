@@ -282,6 +282,18 @@ describe("judging: rubric, assignment, scoring and isolation", () => {
       expect(res.body.judgeId).toBe(judgeA.id);
     });
 
+    it("audits a changed ballot with its values before and after", async () => {
+      const entry = await prisma.auditLog.findFirstOrThrow({
+        where: { eventId: event.id, action: "SCORE_UPDATED", actorId: judgeA.id },
+        orderBy: { createdAt: "desc" },
+      });
+      const meta = entry.metadata as { before: { weightedTotal: number }; after: { weightedTotal: number; criteria: Record<string, number> } };
+      expect(meta.before.weightedTotal).toBe(100);
+      expect(meta.after.weightedTotal).toBe(0);
+      expect(Object.values(meta.after.criteria)).toEqual([1, 1, 1]);
+      expect(entry.summary).toContain("from 100 to 0");
+    });
+
     it("rejects a score outside the criterion range", async () => {
       const queue = await as(judgeA).get(`/api/events/${event.id}/judge/queue`).expect(200);
       const target = queue.body.items[0].submission.id;
@@ -549,6 +561,46 @@ describe("judging: rubric, assignment, scoring and isolation", () => {
       const res = await anon().get(`/api/events/${event.id}/results`).expect(200);
       expect(res.body.standings.length).toBeGreaterThan(0);
       expect(res.body.standings[0].rank).toBe(1);
+    });
+
+    it("freezes ballots while results are published", async () => {
+      const queue = await as(judgeA).get(`/api/events/${event.id}/judge/queue`).expect(200);
+      expect(queue.body.window.open).toBe(false);
+      const target = queue.body.items[0].submission.id;
+      const res = await as(judgeA)
+        .put(`/api/events/${event.id}/judge/scores/${target}`)
+        .send({ criteria: criterionIds.map((id) => ({ criterionId: id, value: 3 })) })
+        .expect(403);
+      expect(res.body.error.message).toContain("frozen");
+    });
+
+    it("keeps the published run pinned when a later run is computed", async () => {
+      const before = await anon().get(`/api/events/${event.id}/results`).expect(200);
+      await as(organizer).post(`/api/events/${event.id}/results/normalize`).send({ method: "RAW" }).expect(201);
+      const after = await anon().get(`/api/events/${event.id}/results`).expect(200);
+      expect(after.body.runId).toBe(before.body.runId);
+      expect(after.body.method).toBe(before.body.method);
+    });
+
+    it("refuses to publish a run the ballots no longer match", async () => {
+      await as(organizer).post(`/api/events/${event.id}/results/publish`).send({ publish: false }).expect(200);
+      const queue = await as(judgeA).get(`/api/events/${event.id}/judge/queue`).expect(200);
+      await as(judgeA)
+        .put(`/api/events/${event.id}/judge/scores/${queue.body.items[0].submission.id}`)
+        .send({ criteria: criterionIds.map((id) => ({ criterionId: id, value: 4 })) })
+        .expect(200);
+
+      const runs = await as(organizer).get(`/api/events/${event.id}/results/runs`).expect(200);
+      expect(runs.body[0].current).toBe(false);
+      await as(organizer).post(`/api/events/${event.id}/results/publish`).send({ publish: true }).expect(409);
+
+      const fresh = await as(organizer).post(`/api/events/${event.id}/results/normalize`).send({ method: "ZSCORE" }).expect(201);
+      await as(organizer)
+        .post(`/api/events/${event.id}/results/publish`)
+        .send({ publish: true, runId: fresh.body.runId })
+        .expect(200);
+      const pub = await anon().get(`/api/events/${event.id}/results`).expect(200);
+      expect(pub.body.runId).toBe(fresh.body.runId);
     });
 
     it("refuses publication to a judge", async () => {

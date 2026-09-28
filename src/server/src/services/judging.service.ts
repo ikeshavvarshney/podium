@@ -17,11 +17,14 @@ import { AuditAction, recordAudit } from "./audit.service.js";
 import type { EventContext } from "./authorization.service.js";
 import { lockRubricIfNeeded, requireRubric } from "./rubric.service.js";
 
-/** The judging window is enforced server-side, exactly like the submission deadline. */
+/** Enforced server-side. Publishing results closes it, so ballots cannot drift from published standings. */
 export function judgingWindow(
-  event: { judgingOpensAt: Date | null; judgingClosesAt: Date | null },
+  event: { judgingOpensAt: Date | null; judgingClosesAt: Date | null; resultsPublished?: boolean },
   now = new Date(),
 ): { open: boolean; reason?: string } {
+  if (event.resultsPublished) {
+    return { open: false, reason: "Results are published, so ballots are frozen." };
+  }
   if (event.judgingOpensAt && now < event.judgingOpensAt) {
     return { open: false, reason: "Judging has not opened yet." };
   }
@@ -31,7 +34,7 @@ export function judgingWindow(
   return { open: true };
 }
 
-function assertJudgingOpen(ctx: EventContext): void {
+export function assertJudgingOpen(ctx: EventContext): void {
   const window = judgingWindow(ctx.event);
   if (!window.open) throw forbidden(window.reason ?? "Judging is closed.");
 }
@@ -337,26 +340,28 @@ export async function submitScore(
   // Computed here, from the stored rubric. A total in the request body is ignored.
   const total = weightedTotal(criteria, input.criteria);
 
-  const existing = await prisma.judgeScore.findUnique({
-    where: { judgeId_submissionId: { judgeId: judge.id, submissionId } },
-    select: { id: true },
-  });
+  const keyByCriterion = new Map(criteria.map((c) => [c.id, c.key]));
+  const byKey = (rows: Array<{ criterionId: string; value: number }>) =>
+    Object.fromEntries(rows.map((r) => [keyByCriterion.get(r.criterionId) ?? r.criterionId, r.value]));
 
-  const score = await prisma.$transaction(async (tx) => {
-    const row = existing
-      ? await tx.judgeScore.update({
-          where: { id: existing.id },
-          data: { weightedTotal: total, comment: input.comment ?? null },
-        })
-      : await tx.judgeScore.create({
-          data: {
-            eventId: ctx.event.id,
-            judgeId: judge.id,
-            submissionId,
-            weightedTotal: total,
-            comment: input.comment ?? null,
-          },
-        });
+  // Upsert, so two racing first submissions resolve to one ballot; `before` feeds the audit diff.
+  const { score, previous } = await prisma.$transaction(async (tx) => {
+    const before = await tx.judgeScore.findUnique({
+      where: { judgeId_submissionId: { judgeId: judge.id, submissionId } },
+      select: { weightedTotal: true, comment: true, criterionScores: { select: { criterionId: true, value: true } } },
+    });
+
+    const row = await tx.judgeScore.upsert({
+      where: { judgeId_submissionId: { judgeId: judge.id, submissionId } },
+      create: {
+        eventId: ctx.event.id,
+        judgeId: judge.id,
+        submissionId,
+        weightedTotal: total,
+        comment: input.comment ?? null,
+      },
+      update: { weightedTotal: total, comment: input.comment ?? null },
+    });
 
     await tx.criterionScore.deleteMany({ where: { scoreId: row.id } });
     await tx.criterionScore.createMany({
@@ -367,22 +372,37 @@ export async function submitScore(
       })),
     });
 
-    return tx.judgeScore.findUniqueOrThrow({
+    const saved = await tx.judgeScore.findUniqueOrThrow({
       where: { id: row.id },
       include: { criterionScores: true },
     });
+    return { score: saved, previous: before };
   });
 
   await lockRubricIfNeeded(ctx.event.id);
 
+  const after = { weightedTotal: total, criteria: byKey(input.criteria), comment: input.comment ?? null };
   await recordAudit({
-    action: existing ? AuditAction.SCORE_UPDATED : AuditAction.SCORE_SUBMITTED,
+    action: previous ? AuditAction.SCORE_UPDATED : AuditAction.SCORE_SUBMITTED,
     eventId: ctx.event.id,
     actorId: judge.id,
     targetType: "judge_score",
     targetId: score.id,
-    summary: `${judge.name} ${existing ? "updated" : "submitted"} a ballot`,
-    metadata: { submissionId, weightedTotal: total },
+    summary: previous
+      ? `${judge.name} changed a ballot from ${previous.weightedTotal} to ${total}`
+      : `${judge.name} submitted a ballot (${total})`,
+    metadata: previous
+      ? {
+          submissionId,
+          weightedTotal: total,
+          before: {
+            weightedTotal: previous.weightedTotal,
+            criteria: byKey(previous.criterionScores),
+            comment: previous.comment,
+          },
+          after,
+        }
+      : { submissionId, weightedTotal: total, after },
     ipHash,
   });
 

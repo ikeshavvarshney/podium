@@ -170,6 +170,8 @@ model Event {
   /// Results stay organizer-only until this flips.
   resultsPublished   Boolean   @default(false) @map("results_published")
   resultsPublishedAt DateTime? @map("results_published_at")
+  /// The run the public sees, pinned at publication.
+  publishedRunId     String?   @unique @map("published_run_id") @db.Uuid
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -189,6 +191,7 @@ model Event {
   assignments       JudgeAssignment[]
   scores            JudgeScore[]
   normalizationRuns NormalizationRun[]
+  publishedRun      NormalizationRun? @relation("PublishedRun", fields: [publishedRunId], references: [id], onDelete: SetNull)
   pairwiseRankings  PairwiseRanking[]
   webhooks          Webhook[]
   seekerListings    SeekerListing[]
@@ -769,10 +772,13 @@ model NormalizationRun {
   /// Rubric weights and run configuration captured at run time.
   parameters Json             @default("{}")
   ballotCount Int             @map("ballot_count")
+  /// SHA-256 of the ballots the run read; publication is refused once they no longer match.
+  ballotDigest String?        @map("ballot_digest")
   createdAt  DateTime         @default(now()) @map("created_at")
 
-  event  Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  scores NormalizedScore[]
+  event       Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  scores      NormalizedScore[]
+  publishedBy Event?            @relation("PublishedRun")
 
   @@index([eventId, createdAt])
   @@map("normalization_runs")
