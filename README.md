@@ -101,13 +101,16 @@ port 5433.
 The suite refuses to run unless `DATABASE_URL` points at a database whose name ends in
 `_test`, so a test run cannot truncate development data.
 
-Current coverage: 339 tests across 28 files, unit and integration: authentication
-(password and passwordless), device sessions, event-scoped RBAC, cross-event isolation,
-role grants and revocation, private-event visibility, team formation and the team board,
-invite-link handling, submission lifecycle, gallery search and filter, server-side
-deadline enforcement, rubric and comparative judging, normalization, voting, webhooks,
-signed judge records, certificates, bulk import, request hardening, and the fixtures.json
-import replayed against the seven acceptance checker probes.
+Current coverage: 412 tests across 34 files, unit and integration: authentication
+(password and passwordless), device sessions, scoped API tokens and instance secrets,
+event-scoped RBAC, cross-event isolation, role grants and revocation, private-event visibility,
+team formation and the team board, invite-link handling, submission lifecycle, gallery search and
+filter, server-side deadline enforcement, rubric and comparative (Bradley-Terry) judging, ballot
+freezing and pinned publication, normalization with shrinkage, panel integrity checks, voting
+(email codes, per-device open links, choice limits), webhooks (outbox, retries, SSRF guard), the
+hash-chained audit log, signed judge records, certificates, bulk import, whole-event export and
+import, request hardening and sign-in limits, and the fixtures.json import replayed against the
+seven acceptance checker probes.
 
 ## Permission model
 
@@ -205,7 +208,7 @@ Claimed honestly in `.dogfood.toml`: T1, T2, T3 and T4. The acceptance checker o
 - Rate limits live in process memory by default. Running more than one API replica, set
   `RATE_LIMIT_STORE=postgres` to share them through the database. Behind a reverse proxy, set `TRUST_PROXY` (a hop count or the proxy's address) so limits
   key on the real client; left unset, `X-Forwarded-For` is ignored because a client could forge it.
-- `npm audit` reports five advisories in `src/server` (the client has none): Vitest's UI server (dev only, never started) and the Prisma CLI's `deepmerge-ts`, which ships in the image only to run migrations at boot and is never fed request data. Fixing them needs major upgrades of Prisma and Vitest, which are not done.
+- `npm audit` reports no advisories in either package. The Prisma CLI's `deepmerge-ts` is pinned to its fixed major with an npm `overrides` entry until Prisma 7.
 
 ## Layout
 
