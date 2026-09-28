@@ -231,8 +231,16 @@ than claim coverage the code does not have.
   event: inside `sample-hack-2026` it acts as its account, anywhere else it authenticates as
   nobody, and it never carries the account's organizer capability, so it cannot create events.
   `FIXTURE_TOKENS=false` skips them and `DELETE /api/auth/tokens/:id` revokes one. Session and
-  record-signing secrets are generated per instance on first boot, so knowing the repository
-  does not let anyone forge a session.
+  record-signing secrets are generated per instance on first boot and stored in the database, so
+  knowing the repository does not let anyone forge a session from the outside.
+- **The database is the trust anchor, so it is not exposed off-box.** The session secret lives in
+  Postgres, which means anyone who can reach the database with its credentials can mint a session.
+  The default `POSTGRES_PASSWORD` is a development convenience, so `docker-compose.yml` publishes
+  the Postgres port on `127.0.0.1` only: the API reaches it over the compose network and the host
+  can reach it for local development and the test runner, but it is never on a public interface.
+  To expose it deliberately (a separate database host, for example), set `POSTGRES_HOST_BIND` and a
+  strong `POSTGRES_PASSWORD`. The application ports (API and web) stay published because they
+  enforce authentication on every request; the raw database does not.
 - **No anomaly detection.** Flagged voting activity (shared IP across voter keys) is
   surfaced to the organizer for a human decision; nothing is auto-blocked, so a patient
   attacker below the flagging threshold is not caught by the platform itself.

@@ -79,6 +79,7 @@ The ones that matter before a real event:
 | `FIXTURE_TOKENS` | `true` | Issues the acceptance checker's public tokens, scoped to the fixture event only. |
 | `JWT_SECRET`, `RECORD_SIGNING_SECRET` | generated | Empty means the API generates both on first boot and keeps them in the database. Set them to manage secrets yourself (32+ characters). |
 | `COOKIE_SECURE` | `false` | Set `true` behind HTTPS. |
+| `POSTGRES_HOST_BIND` | `127.0.0.1` | Interface the database port publishes on. Loopback by default so Postgres is never on a public interface; set `0.0.0.0` only with a strong `POSTGRES_PASSWORD`. |
 | `PUBLIC_WEB_URL`, `PUBLIC_API_URL`, `CORS_ORIGIN`, `NEXT_PUBLIC_API_URL` | localhost | Where browsers reach the web client and the API. |
 | `TRUST_PROXY` | `false` | Behind a reverse proxy, a hop count or the proxy's address, so limits key on the real client. |
 | `SMTP_URL`, `MAIL_FROM` | empty | Mail server for sign-in links and voting codes. Empty keeps the platform offline: messages go to the API log. |

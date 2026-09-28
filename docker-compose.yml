@@ -21,7 +21,11 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
     ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+      # Bound to loopback: the API reaches Postgres over the compose network, and only the
+      # host (local dev and the test runner) needs the published port. It is never on a public
+      # interface, so the default password cannot be used to reach the database from off-box.
+      # Set POSTGRES_HOST_BIND=0.0.0.0 and a strong POSTGRES_PASSWORD to expose it deliberately.
+      - "${POSTGRES_HOST_BIND:-127.0.0.1}:${POSTGRES_PORT:-5433}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-podium} -d ${POSTGRES_DB:-podium}"]
       interval: 3s
