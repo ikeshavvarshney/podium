@@ -1,11 +1,13 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ApiError, del, get, mediaUrl, post } from "@/lib/api";
 import { hue, initials } from "@/lib/hues";
 import { useSession } from "@/components/providers/session-provider";
 import type { Comment, Submission } from "@/lib/types";
 import { utcDateTime } from "@/lib/format";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 /**
  * The gallery detail modal, opened from a submission card. Comments load
@@ -24,6 +26,11 @@ export function GalleryModal({
   onClose: () => void;
 }) {
   const { user } = useSession();
+  const router = useRouter();
+  const [flagging, setFlagging] = useState(false);
+  const [flagReason, setFlagReason] = useState("");
+  const [flagBusy, setFlagBusy] = useState(false);
+  const [flagError, setFlagError] = useState("");
   const [entry, setEntry] = useState<Submission | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState("");
@@ -65,6 +72,21 @@ export function GalleryModal({
       setError(err instanceof ApiError ? err.message : "Your comment could not be posted.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function flagProject() {
+    setFlagBusy(true);
+    setFlagError("");
+    try {
+      await post(`/events/${slug}/submissions/${submissionId}/flag`, { reason: flagReason.trim() });
+      setFlagging(false);
+      onClose();
+      router.refresh();
+    } catch (err) {
+      setFlagError(err instanceof ApiError ? err.message : "The project could not be flagged.");
+    } finally {
+      setFlagBusy(false);
     }
   }
 
@@ -218,10 +240,49 @@ export function GalleryModal({
                 )}
                 {error && <p className="mt-2 text-small text-danger">{error}</p>}
               </div>
+              {isEventAdmin && entry.status === "SUBMITTED" ? (
+                <div className="mt-[22px] flex flex-wrap items-center gap-3 border-t border-line pt-[18px]">
+                  <span className="min-w-0 flex-1 text-small text-muted">Organizer: remove this project from public view.</span>
+                  <button
+                    type="button"
+                    onClick={() => setFlagging(true)}
+                    className="btn btn-sm hover:border-danger hover:text-danger"
+                  >
+                    Flag project
+                  </button>
+                </div>
+              ) : null}
             </>
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={flagging}
+        title={`Flag ${entry?.name ?? "this project"}?`}
+        confirmLabel="Flag and hide"
+        tone="danger"
+        busy={flagBusy}
+        confirmDisabled={flagReason.trim().length < 3}
+        onConfirm={() => void flagProject()}
+        onCancel={() => setFlagging(false)}
+      >
+        <p className="m-0">
+          It leaves the gallery, judge queues, community voting, results and winners. The project and its scores stay
+          stored, the team sees your reason, and you can restore it from the dashboard.
+        </p>
+        <label className="mt-3 grid gap-1.5">
+          <span className="text-small font-medium text-text">Reason (required)</span>
+          <textarea
+            rows={3}
+            maxLength={500}
+            value={flagReason}
+            onChange={(e) => setFlagReason(e.target.value)}
+            placeholder="For example: built before the event window"
+            className="w-full resize-y rounded-[10px] border border-line-strong bg-surface px-[13px] py-2.5 text-ui text-text outline-none focus:border-muted"
+          />
+        </label>
+        {flagError ? <p className="m-0 mt-2 text-small text-danger">{flagError}</p> : null}
+      </ConfirmDialog>
     </div>
   );
 }

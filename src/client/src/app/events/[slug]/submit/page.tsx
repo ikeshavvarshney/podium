@@ -209,7 +209,8 @@ export default function SubmitPage() {
 
   const deadlineMs = window_?.deadline ? new Date(window_.deadline).getTime() : null;
   const pastDeadline = deadlineMs !== null && now !== null && now >= deadlineMs;
-  const locked = !window_?.open || !!submission?.lockedAt || pastDeadline;
+  const flagged = submission?.status === "DISQUALIFIED";
+  const locked = flagged || !window_?.open || !!submission?.lockedAt || pastDeadline;
   const isSubmitted = submission?.status === "SUBMITTED";
 
   function markEdited() {
@@ -509,7 +510,9 @@ export default function SubmitPage() {
   const deadlineUrgent = now !== null && deadlineMs !== null && deadlineMs > now && deadlineMs - now < 2 * 86_400_000;
 
   const summaryEntries = Object.entries(errors).filter(([, text]) => text);
-  const lockedReason = submission?.lockedAt
+  const lockedReason = flagged
+    ? `The organizers removed this project from the event: ${submission?.flagReason ?? "no reason given"}`
+    : submission?.lockedAt
     ? "An organizer locked this submission."
     : pastDeadline || window_?.reason === undefined
       ? "The submission deadline has passed."
@@ -559,7 +562,7 @@ export default function SubmitPage() {
                 color: isSubmitted ? "var(--ok-fg)" : "var(--mu)",
               }}
             >
-              {isSubmitted ? "Submitted" : submission ? "Draft" : "Not started"}
+              {flagged ? "Removed by organizers" : isSubmitted ? "Submitted" : submission ? "Draft" : "Not started"}
             </span>
             <span
               className={`rounded-[5px] px-2 py-1 font-mono text-meta ${

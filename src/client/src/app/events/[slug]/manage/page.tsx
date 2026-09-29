@@ -7,11 +7,12 @@ import { AttentionPanel } from "@/components/admin/attention-panel";
 import { PhaseStrip } from "@/components/admin/phase-strip";
 import { ScreenSkeleton } from "@/components/layout/screen-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { apiBase, ApiError, get } from "@/lib/api";
+import { apiBase, ApiError, get, post } from "@/lib/api";
 import { hue, initials, type HueName } from "@/lib/hues";
 import { formatDeadline } from "@/lib/participant-step";
 import type { EventStatus } from "@/lib/types";
-import { utcTime } from "@/lib/format";
+import { utcDateTime, utcTime } from "@/lib/format";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface Progress {
   target: number;
@@ -20,7 +21,6 @@ interface Progress {
     name: string;
     email: string;
     org: string | null;
-    trackScope: string[];
     assigned: number;
     completed: number;
     skipped: number;
@@ -290,6 +290,8 @@ export default function ManageEventPage() {
         </section>
       </div>
 
+      <FlaggedProjects slug={slug} />
+
       <section aria-labelledby="progress-title" className="mt-9">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -492,5 +494,88 @@ export default function ManageEventPage() {
         </p>
       </details>
     </main>
+  );
+}
+
+interface FlaggedRow {
+  id: string;
+  name: string;
+  status: string;
+  flagReason: string | null;
+  flaggedAt: string | null;
+  team: { name: string };
+}
+
+function FlaggedProjects({ slug }: { slug: string }) {
+  const [rows, setRows] = useState<FlaggedRow[]>([]);
+  const [restoring, setRestoring] = useState<FlaggedRow | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const load = useCallback(
+    () =>
+      get<FlaggedRow[]>(`/events/${slug}/submissions/all`)
+        .then((all) => setRows(all.filter((s) => s.status === "DISQUALIFIED")))
+        .catch(() => setRows([])),
+    [slug],
+  );
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function restore(row: FlaggedRow) {
+    setBusy(true);
+    setError("");
+    try {
+      await post(`/events/${slug}/submissions/${row.id}/restore`, {});
+      setRestoring(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "The project could not be restored.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (rows.length === 0) return null;
+
+  return (
+    <section aria-labelledby="flagged-title" className="mt-9">
+      <h2 id="flagged-title" className="m-0 text-title font-semibold tracking-head">
+        Flagged projects
+      </h2>
+      <p className="mt-1.5 text-small leading-[1.5] text-muted">
+        Hidden from the gallery, judging, voting, results and winners. Still stored, and still in the exports.
+      </p>
+      <div className="mt-3 grid">
+        {rows.map((r) => (
+          <div key={r.id} className="flex flex-wrap items-center gap-3 border-b border-line py-3">
+            <div className="min-w-0 flex-[1_1_260px]">
+              <div className="text-ui">
+                {r.name} <span className="text-muted">· {r.team.name}</span>
+              </div>
+              <div className="text-small leading-[1.5] text-muted">
+                {r.flagReason}
+                {r.flaggedAt ? ` · ${utcDateTime(r.flaggedAt)}` : ""}
+              </div>
+            </div>
+            <button type="button" onClick={() => setRestoring(r)} className="btn btn-sm flex-none">
+              Restore
+            </button>
+          </div>
+        ))}
+      </div>
+      {error ? <p className="mt-2 text-small text-danger">{error}</p> : null}
+      <ConfirmDialog
+        open={restoring !== null}
+        title={restoring ? `Restore ${restoring.name}?` : ""}
+        confirmLabel="Restore"
+        busy={busy}
+        onConfirm={() => restoring && void restore(restoring)}
+        onCancel={() => setRestoring(null)}
+      >
+        <p className="m-0">It returns to the gallery, judge queues, community voting, results and winners.</p>
+      </ConfirmDialog>
+    </section>
   );
 }
