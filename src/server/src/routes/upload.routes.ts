@@ -48,6 +48,17 @@ router.post(
       eventId = event.id;
     }
 
+    const sha256 = createHash("sha256").update(data).digest("hex");
+    const same = await prisma.upload.findFirst({
+      where: { ownerId: user.id, sha256, OR: [{ eventId }, { eventId: null }] },
+      select: { id: true, contentType: true, size: true, sha256: true, eventId: true },
+    });
+    if (same) {
+      if (eventId && !same.eventId) await prisma.upload.update({ where: { id: same.id }, data: { eventId } });
+      res.status(200).json({ id: same.id, contentType: same.contentType, size: same.size, sha256: same.sha256, url: uploadUrl(same.id) });
+      return;
+    }
+
     const today = await prisma.upload.aggregate({
       where: { ownerId: user.id, createdAt: { gte: new Date(Date.now() - 86_400_000) } },
       _sum: { size: true },
@@ -62,7 +73,7 @@ router.post(
         eventId,
         contentType,
         size: data.length,
-        sha256: createHash("sha256").update(data).digest("hex"),
+        sha256,
         data: new Uint8Array(data),
       },
       select: { id: true, contentType: true, size: true, sha256: true },

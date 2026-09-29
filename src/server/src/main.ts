@@ -2,11 +2,13 @@ import { createApp } from "./app.js";
 import { config } from "./config.js";
 import { prisma } from "./db.js";
 import { initSecrets } from "./lib/instance-secrets.js";
+import { startUploadPruner } from "./services/upload.service.js";
 import { startWebhookWorker } from "./services/webhook.service.js";
 
 await initSecrets(prisma);
 const app = createApp();
 startWebhookWorker();
+startUploadPruner();
 
 const server = app.listen(config.PORT, () => {
   console.log(`[podium] API listening on http://localhost:${config.PORT}`);
