@@ -11,8 +11,9 @@ import {
   requireOrganizerCapability,
 } from "../middleware/event-context.js";
 import { writeRateLimit } from "../middleware/rate-limit.js";
-import { validate } from "../middleware/validate.js";
+import { httpUrl, validate } from "../middleware/validate.js";
 import {
+  REGISTRATION_FIELDS,
   checkSlug,
   createEvent,
   getEventDetail,
@@ -66,6 +67,11 @@ const createEventSchema = z.object({
   mode: z.nativeEnum(EventMode).optional(),
   place: z.string().trim().max(160).nullish(),
   reviewsPerSubmission: z.number().int().min(1).max(20).optional(),
+  logoUrl: httpUrl.nullish(),
+  bannerUrl: httpUrl.nullish(),
+  registrationFields: z
+    .object(Object.fromEntries(REGISTRATION_FIELDS.map((f) => [f, z.enum(["required", "optional", "off"]).optional()])))
+    .optional(),
   ...timelineShape,
 });
 

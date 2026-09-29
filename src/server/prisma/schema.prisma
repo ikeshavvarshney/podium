@@ -201,6 +201,11 @@ model Event {
   tagline     String?
   description String?
   themeTags   String[]        @default([]) @map("theme_tags")
+  /// A square logo and a wide banner, both links to uploaded images.
+  logoUrl     String?         @map("logo_url")
+  bannerUrl   String?         @map("banner_url")
+  /// Which standard registration fields are required, optional or not asked, keyed by field.
+  registrationFields Json     @default("{}") @map("registration_fields")
   status      EventStatus     @default(DRAFT)
   visibility  EventVisibility @default(PUBLIC)
 

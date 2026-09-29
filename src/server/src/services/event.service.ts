@@ -12,6 +12,7 @@ import { prisma } from "../db.js";
 import { badRequest, conflict, forbidden, notFound } from "../lib/errors.js";
 import type { AuthUser } from "../middleware/auth.js";
 import { AuditAction, recordAudit } from "./audit.service.js";
+import { claimUploads } from "./upload.service.js";
 import type { EventContext } from "./authorization.service.js";
 
 export interface EventTimeline {
@@ -23,6 +24,16 @@ export interface EventTimeline {
   judgingClosesAt?: Date | null;
   votingOpensAt?: Date | null;
   votingClosesAt?: Date | null;
+}
+
+/** Standard registration fields an organizer can require, leave optional or not ask. Name and email are always asked. */
+export const REGISTRATION_FIELDS = ["org", "currentRole", "track", "experience", "skills"] as const;
+export type RegistrationField = (typeof REGISTRATION_FIELDS)[number];
+export type FieldRule = "required" | "optional" | "off";
+
+export function fieldRules(stored: unknown): Record<RegistrationField, FieldRule> {
+  const saved = (stored && typeof stored === "object" ? stored : {}) as Partial<Record<RegistrationField, FieldRule>>;
+  return Object.fromEntries(REGISTRATION_FIELDS.map((f) => [f, saved[f] ?? "optional"])) as Record<RegistrationField, FieldRule>;
 }
 
 export interface CreateEventInput extends EventTimeline {
@@ -39,6 +50,9 @@ export interface CreateEventInput extends EventTimeline {
   reviewsPerSubmission?: number;
   mode?: EventMode;
   place?: string | null;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+  registrationFields?: Partial<Record<RegistrationField, FieldRule>>;
 }
 
 export function slugify(input: string): string {
@@ -145,6 +159,9 @@ export async function createEvent(user: AuthUser, input: CreateEventInput, ipHas
       reviewsPerSubmission: input.reviewsPerSubmission ?? 3,
       mode: input.mode ?? EventMode.HYBRID,
       place: input.place?.trim() || null,
+      logoUrl: input.logoUrl ?? null,
+      bannerUrl: input.bannerUrl ?? null,
+      registrationFields: fieldRules(input.registrationFields),
       ownerId: user.id,
       registrationOpensAt: input.registrationOpensAt ?? null,
       registrationClosesAt: input.registrationClosesAt ?? null,
@@ -160,6 +177,8 @@ export async function createEvent(user: AuthUser, input: CreateEventInput, ipHas
       votingConfig: { create: {} },
     },
   });
+
+  await claimUploads(user.id, event.id, [event.logoUrl, event.bannerUrl]);
 
   await recordAudit({
     action: AuditAction.EVENT_CREATED,
@@ -206,6 +225,11 @@ export async function updateEvent(
   if (input.eligibility !== undefined) data.eligibility = input.eligibility;
   if (input.mode !== undefined) data.mode = input.mode;
   if (input.place !== undefined) data.place = input.place?.trim() || null;
+  if (input.logoUrl !== undefined) data.logoUrl = input.logoUrl;
+  if (input.bannerUrl !== undefined) data.bannerUrl = input.bannerUrl;
+  if (input.registrationFields !== undefined) {
+    data.registrationFields = fieldRules({ ...fieldRules(ctx.event.registrationFields), ...input.registrationFields });
+  }
   if (input.reviewsPerSubmission !== undefined) {
     data.reviewsPerSubmission = input.reviewsPerSubmission;
   }
@@ -217,6 +241,7 @@ export async function updateEvent(
   if (input.status !== undefined) data.status = input.status;
 
   const updated = await prisma.event.update({ where: { id: ctx.event.id }, data });
+  if (ctx.user) await claimUploads(ctx.user.id, updated.id, [input.logoUrl, input.bannerUrl]);
 
   await recordAudit({
     action: statusChanged ? AuditAction.EVENT_STATUS_CHANGED : AuditAction.EVENT_UPDATED,
@@ -384,6 +409,21 @@ export async function registerForEvent(
   const missing = questions.filter((q) => q.required && !answers.get(q.id));
   if (missing.length > 0) {
     throw badRequest(`Answer the required question: ${missing[0]!.prompt}`);
+  }
+
+  // Standard fields the organizer made required. The organization lives on the account.
+  const rules = fieldRules(event.registrationFields);
+  const hasTracks = rules.track === "required" && (await prisma.track.count({ where: { eventId: event.id } })) > 0;
+  const org = rules.org === "required" ? (await prisma.user.findUnique({ where: { id: user.id }, select: { org: true } }))?.org : "set";
+  const unanswered = [
+    rules.org === "required" && !org?.trim() && "your organization or university",
+    rules.currentRole === "required" && !input.currentRole?.trim() && "your current role",
+    hasTracks && !input.trackId && "a track",
+    rules.experience === "required" && !input.experience && "your experience",
+    rules.skills === "required" && !(input.skills ?? []).length && "at least one skill",
+  ].filter(Boolean);
+  if (unanswered.length > 0) {
+    throw badRequest(`This event asks for ${unanswered[0]}.`);
   }
 
   const detailed =
