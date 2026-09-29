@@ -45,7 +45,19 @@ export function validate(schemas: Schemas) {
   return Object.assign(middleware, { schemas });
 }
 
-export const httpUrl = z
-  .string()
-  .trim()
-  .refine((v) => /^https?:\/\/\S+\.\S+/.test(v), "Must be a full URL, including https://");
+// A dotted host, localhost or an IPv6 literal: a stock local deployment serves its own uploads from
+// http://localhost:4000, so requiring a dot rejected the platform's own links.
+export function isHttpUrl(value: string): boolean {
+  if (/\s/.test(value)) return false;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  const host = url.hostname;
+  return host === "localhost" || host.startsWith("[") || /^[^.]+(\.[^.]+)+$/.test(host);
+}
+
+export const httpUrl = z.string().trim().refine(isHttpUrl, "Must be a full URL, including https://");
