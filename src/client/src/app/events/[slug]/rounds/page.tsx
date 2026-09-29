@@ -6,8 +6,10 @@ import { ScreenSkeleton } from "@/components/layout/screen-skeleton";
 import { ApiError, del, get, patch, post } from "@/lib/api";
 import { hue, type HueName } from "@/lib/hues";
 import type { EventDetail } from "@/lib/types";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
+import { fromUtcInput, utcDateTime } from "@/lib/format";
 
 type RoundKind = "QUIZ" | "SUBMISSION" | "SCORING" | "PITCH" | "VOTE" | "RESULT";
 
@@ -44,8 +46,7 @@ function stateOf(round: Round, now: number): RoundState {
 const STATE_HUE: Record<RoundState, HueName> = { upcoming: "info", live: "success", closed: "neutral" };
 
 function roundWindow(round: Round): string {
-  const fmt = (iso: string) =>
-    new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const fmt = (iso: string) => utcDateTime(iso, { month: "short", day: "numeric" });
   if (round.opensAt && round.closesAt) return `${fmt(round.opensAt)}-${fmt(round.closesAt)}`;
   if (round.closesAt) return `until ${fmt(round.closesAt)}`;
   if (round.opensAt) return `from ${fmt(round.opensAt)}`;
@@ -62,7 +63,7 @@ export default function RoundsPage() {
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [rounds, setRounds] = useState<Round[]>([]);
   const [error, setError] = useState("");
-  const [now] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [draft, setDraft] = useState({
     name: "",
     kind: "SCORING" as RoundKind,
@@ -72,6 +73,8 @@ export default function RoundsPage() {
     advances: "",
   });
   const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<{ action: "live" | "close" | "reopen"; round: Round } | null>(null);
+  const [pendingBusy, setPendingBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -81,6 +84,7 @@ export default function RoundsPage() {
       ]);
       setEvent(detail);
       setRounds(list);
+      setNow(Date.now());
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Rounds could not be loaded.");
     }
@@ -98,8 +102,8 @@ export default function RoundsPage() {
         name: draft.name.trim(),
         kind: draft.kind,
         description: draft.description.trim() || null,
-        opensAt: draft.opensAt ? new Date(draft.opensAt).toISOString() : null,
-        closesAt: draft.closesAt ? new Date(draft.closesAt).toISOString() : null,
+        opensAt: fromUtcInput(draft.opensAt),
+        closesAt: fromUtcInput(draft.closesAt),
         advances: draft.advances ? Number(draft.advances) : null,
       });
       setDraft({ name: "", kind: "SCORING", description: "", opensAt: "", closesAt: "", advances: "" });
@@ -112,12 +116,36 @@ export default function RoundsPage() {
   }
 
   async function makeLive(round: Round) {
+    const at = Date.now();
+    // A closed round keeps its old close date, which would now fall before the new opening.
+    const ended = round.closesAt !== null && new Date(round.closesAt).getTime() <= at;
     try {
-      await patch(`/events/${slug}/rounds/${round.id}`, { opensAt: new Date().toISOString() });
+      await patch(`/events/${slug}/rounds/${round.id}`, {
+        opensAt: new Date(at).toISOString(),
+        ...(ended ? { closesAt: null } : {}),
+      });
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "That round could not be opened.");
     }
+  }
+
+  async function closeNow(round: Round) {
+    try {
+      await patch(`/events/${slug}/rounds/${round.id}`, { closesAt: new Date().toISOString() });
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "That round could not be closed.");
+    }
+  }
+
+  async function confirmPending() {
+    if (!pending) return;
+    setPendingBusy(true);
+    const run = { live: makeLive, close: closeNow, reopen }[pending.action];
+    await run(pending.round);
+    setPendingBusy(false);
+    setPending(null);
   }
 
   async function reopen(round: Round) {
@@ -227,12 +255,12 @@ export default function RoundsPage() {
               Export CSV
             </button>
             {canEdit && lastClosed ? (
-              <button type="button" onClick={() => void reopen(lastClosed.round)} className="btn btn-sm text-muted hover:text-text">
+              <button type="button" onClick={() => setPending({ action: "reopen", round: lastClosed.round })} className="btn btn-sm text-muted hover:text-text">
                 Reopen previous
               </button>
             ) : null}
             {canEdit && nextUp ? (
-              <button type="button" onClick={() => void makeLive(nextUp.round)} className="btn-primary btn-sm">
+              <button type="button" onClick={() => setPending({ action: "live", round: nextUp.round })} className="btn-primary btn-sm">
                 Open {nextUp.round.name}
               </button>
             ) : null}
@@ -313,8 +341,17 @@ export default function RoundsPage() {
                     {state}
                   </span>
                   {canEdit && state !== "live" ? (
-                    <button type="button" onClick={() => void makeLive(round)} className="btn btn-sm">
+                    <button type="button" onClick={() => setPending({ action: "live", round })} className="btn btn-sm">
                       Make live
+                    </button>
+                  ) : null}
+                  {canEdit && state === "live" ? (
+                    <button
+                      type="button"
+                      onClick={() => setPending({ action: "close", round })}
+                      className="btn btn-sm hover:border-danger hover:text-danger"
+                    >
+                      Close now
                     </button>
                   ) : null}
                   {canEdit && state === "upcoming" ? (
@@ -350,8 +387,8 @@ export default function RoundsPage() {
                 </option>
               ))}
             </select>
-            <input type="datetime-local" className={FIELD} value={draft.opensAt} onChange={(e) => setDraft({ ...draft, opensAt: e.target.value })} aria-label="Opens" />
-            <input type="datetime-local" className={FIELD} value={draft.closesAt} onChange={(e) => setDraft({ ...draft, closesAt: e.target.value })} aria-label="Closes" />
+            <input type="datetime-local" className={FIELD} value={draft.opensAt} onChange={(e) => setDraft({ ...draft, opensAt: e.target.value })} aria-label="Opens (UTC)" title="Opens, in UTC" />
+            <input type="datetime-local" className={FIELD} value={draft.closesAt} onChange={(e) => setDraft({ ...draft, closesAt: e.target.value })} aria-label="Closes (UTC)" title="Closes, in UTC" />
             <input type="number" min={1} className={FIELD} placeholder="Advance (optional)" value={draft.advances} onChange={(e) => setDraft({ ...draft, advances: e.target.value })} />
           </div>
           <textarea
@@ -370,6 +407,40 @@ export default function RoundsPage() {
         </section>
       ) : null}
 
+      <ConfirmDialog
+        open={pending !== null}
+        title={
+          pending
+            ? pending.action === "close"
+              ? `Close ${pending.round.name} now?`
+              : pending.action === "reopen"
+                ? `Reopen ${pending.round.name}?`
+                : `Make ${pending.round.name} live now?`
+            : ""
+        }
+        confirmLabel={pending?.action === "close" ? "Close round" : pending?.action === "reopen" ? "Reopen round" : "Make live"}
+        tone={pending?.action === "close" ? "danger" : "primary"}
+        busy={pendingBusy}
+        onConfirm={() => void confirmPending()}
+        onCancel={() => setPending(null)}
+      >
+        {pending ? (
+          <>
+            <p className="m-0">
+              {pending.action === "close"
+                ? "The round ends now and shows as closed on the ladder. You can reopen it later."
+                : pending.action === "reopen"
+                  ? "The round goes live again for the next 24 hours."
+                  : pending.round.closesAt && new Date(pending.round.closesAt).getTime() > Date.now()
+                    ? "The round opens now and keeps its scheduled close time."
+                    : "The round opens now and stays live until you close it."}
+            </p>
+            <p className="m-0 mt-2">
+              This changes the published schedule only. Submission and judging windows follow the dates in the event settings.
+            </p>
+          </>
+        ) : null}
+      </ConfirmDialog>
     </main>
   );
 }
