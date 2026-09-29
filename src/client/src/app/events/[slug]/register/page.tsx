@@ -7,9 +7,10 @@ import { ScreenSkeleton } from "@/components/layout/screen-skeleton";
 import { useSession } from "@/components/providers/session-provider";
 import { ApiError, get, patch, post } from "@/lib/api";
 import { coverHue, hue } from "@/lib/hues";
-import type { CustomQuestion, EventDetail, Team } from "@/lib/types";
+import type { CustomQuestion, EventDetail, FieldRule, RegistrationField, Team } from "@/lib/types";
 import { Notice } from "@/components/ui/notice";
 import { Field } from "@/components/ui/field";
+import { utcDateTime } from "@/lib/format";
 
 const FIELD =
   "w-full bg-surface border border-line-strong rounded-[10px] px-[13px] py-2.5 text-ui text-text outline-none focus:border-muted [transition:border-color_200ms]";
@@ -86,8 +87,24 @@ export default function RegisterPage() {
     setOrg(user.org ?? "");
   }, [user]);
 
+  const rules: Record<RegistrationField, FieldRule> = {
+    org: "optional",
+    currentRole: "optional",
+    track: "optional",
+    experience: "optional",
+    skills: "optional",
+    ...(event?.registrationFields ?? {}),
+  };
+  const asks = (f: RegistrationField) => rules[f] !== "off";
+  const tag = (f: RegistrationField) => (rules[f] === "required" ? " (required)" : "");
+
   const missing: Record<string, string> = {};
   if (!name.trim()) missing.name = "Your name is required.";
+  if (rules.org === "required" && !org.trim()) missing.org = "This event asks for your organization or university.";
+  if (rules.currentRole === "required" && !currentRole.trim()) missing.role = "This event asks for your current role.";
+  if (rules.track === "required" && (event?.tracks.length ?? 0) > 0 && !trackId) missing.track = "Choose a track.";
+  if (rules.experience === "required" && !experience) missing.experience = "Choose your experience.";
+  if (rules.skills === "required" && skills.length === 0) missing.skills = "Pick at least one skill.";
   if (entryType === "team" && !teamName.trim()) missing.team = "Name the team, or enter solo.";
   for (const q of questions) {
     if (q.required && !answers[q.id]?.trim()) missing[q.id] = "This question is required.";
@@ -170,7 +187,7 @@ export default function RegisterPage() {
 
   const cover = hue(coverHue(event.name));
   const fmt = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : null;
+    iso ? utcDateTime(iso) : null;
   const eventWindow = [fmt(event.submissionsOpenAt), fmt(event.submissionDeadline)].filter(Boolean).join(" to ");
   const closed = Boolean(event.registrationClosesAt && new Date(event.registrationClosesAt).getTime() < Date.now());
   const mode = MODE_LABEL[event.mode ?? "HYBRID"];
@@ -280,8 +297,12 @@ export default function RegisterPage() {
           {[
             { key: "name", label: "Full name", value: name, set: setName, placeholder: "", readOnly: false, ac: "name" },
             { key: "email", label: "Email", value: user.email, set: () => undefined, placeholder: "", readOnly: true, ac: "email" },
-            { key: "org", label: "Organization or university", value: org, set: setOrg, placeholder: "", readOnly: false, ac: "organization" },
-            { key: "role", label: "Current role", value: currentRole, set: setCurrentRole, placeholder: "Student, engineer, researcher...", readOnly: false, ac: "organization-title" },
+            ...(asks("org")
+              ? [{ key: "org", label: `Organization or university${tag("org")}`, value: org, set: setOrg, placeholder: "", readOnly: false, ac: "organization" }]
+              : []),
+            ...(asks("currentRole")
+              ? [{ key: "role", label: `Current role${tag("currentRole")}`, value: currentRole, set: setCurrentRole, placeholder: "Student, engineer, researcher...", readOnly: false, ac: "organization-title" }]
+              : []),
           ].map((f) => (
             <Field key={f.key} label={f.label} error={show(f.key)} bordered>
               <input
@@ -296,9 +317,9 @@ export default function RegisterPage() {
             </Field>
           ))}
 
-          {event.tracks.length > 0 ? (
+          {event.tracks.length > 0 && asks("track") ? (
             <>
-              <div className="eyebrow mt-[clamp(26px,4vw,34px)]">Track</div>
+              <div className="eyebrow mt-[clamp(26px,4vw,34px)]">Track{tag("track")}</div>
               <div role="group" aria-label="Track" className="mt-3 flex flex-wrap gap-[7px]">
                 {event.tracks.map((t) => (
                   <button
@@ -312,6 +333,7 @@ export default function RegisterPage() {
                   </button>
                 ))}
               </div>
+              {show("track") ? <p className="mt-1.5 text-small text-danger">{show("track")}</p> : null}
             </>
           ) : null}
 
@@ -341,7 +363,9 @@ export default function RegisterPage() {
             </Field>
           ) : null}
 
-          <div className="eyebrow mt-[clamp(26px,4vw,34px)]">Experience</div>
+          {asks("experience") ? (
+            <>
+          <div className="eyebrow mt-[clamp(26px,4vw,34px)]">Experience{tag("experience")}</div>
           <div role="group" aria-label="Experience" className="mt-3 flex flex-wrap gap-[7px]">
             {EXPERIENCE.map((x) => (
               <button key={x.id} type="button" onClick={() => setExperience(experience === x.id ? "" : x.id)} aria-pressed={experience === x.id} className="pill active:scale-95" style={chipStyle(experience === x.id)}>
@@ -349,9 +373,16 @@ export default function RegisterPage() {
               </button>
             ))}
           </div>
+          {show("experience") ? <p className="mt-1.5 text-small text-danger">{show("experience")}</p> : null}
+            </>
+          ) : null}
 
-          <div className="eyebrow mt-[clamp(26px,4vw,34px)]">Skills</div>
-          <p className="mt-2 text-small leading-[1.5] text-muted">Used for teammate matching on the board. Optional.</p>
+          {asks("skills") ? (
+            <>
+          <div className="eyebrow mt-[clamp(26px,4vw,34px)]">Skills{tag("skills")}</div>
+          <p className="mt-2 text-small leading-[1.5] text-muted">
+            Used for teammate matching on the board.{rules.skills === "required" ? "" : " Optional."}
+          </p>
           <div role="group" aria-label="Skills" className="mt-3 flex flex-wrap gap-[7px]">
             {SKILLS.map((skill) => {
               const on = skills.includes(skill);
@@ -368,22 +399,64 @@ export default function RegisterPage() {
               );
             })}
           </div>
+          {show("skills") ? <p className="mt-1.5 text-small text-danger">{show("skills")}</p> : null}
+            </>
+          ) : null}
 
           {questions.length > 0 ? (
             <>
               <div className="eyebrow mt-[clamp(26px,4vw,34px)]">Questions from the organizer</div>
-              {questions.map((q) => (
-                <Field key={q.id} label={q.required ? `${q.prompt} (required)` : q.prompt} error={show(q.id)} bordered>
-                  <textarea
-                    rows={4}
-                    className={`${FIELD} resize-y leading-[1.65]`}
-                    placeholder={q.helpText ?? ""}
-                    value={answers[q.id] ?? ""}
-                    onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
-                    style={show(q.id) ? { borderColor: "var(--err)" } : undefined}
-                  />
-                </Field>
-              ))}
+              {questions.map((q) => {
+                const value = answers[q.id] ?? "";
+                const set = (v: string) => setAnswers((prev) => ({ ...prev, [q.id]: v }));
+                const picked = value ? value.split("\n") : [];
+                const border = show(q.id) ? { borderColor: "var(--err)" } : undefined;
+                return (
+                  <Field key={q.id} label={q.required ? `${q.prompt} (required)` : q.prompt} hint={q.helpText ?? undefined} error={show(q.id)} bordered>
+                    {q.type === "SELECT" || q.type === "BOOLEAN" ? (
+                      <div role="radiogroup" aria-label={q.prompt} className="grid gap-2">
+                        {(q.type === "BOOLEAN" ? ["Yes", "No"] : q.options ?? []).map((o) => (
+                          <label key={o} className="flex cursor-pointer items-center gap-2.5 text-ui">
+                            <input type="radio" name={q.id} checked={value === o} onChange={() => set(o)} className="h-[16px] w-[16px] accent-action" />
+                            {o}
+                          </label>
+                        ))}
+                      </div>
+                    ) : q.type === "MULTI_SELECT" ? (
+                      <div role="group" aria-label={q.prompt} className="grid gap-2">
+                        {(q.options ?? []).map((o) => (
+                          <label key={o} className="flex cursor-pointer items-center gap-2.5 text-ui">
+                            <input
+                              type="checkbox"
+                              checked={picked.includes(o)}
+                              onChange={(e) => set((e.target.checked ? [...picked, o] : picked.filter((x) => x !== o)).join("\n"))}
+                              className="h-[16px] w-[16px] accent-action"
+                            />
+                            {o}
+                          </label>
+                        ))}
+                      </div>
+                    ) : q.type === "SHORT_TEXT" || q.type === "URL" ? (
+                      <input
+                        type={q.type === "URL" ? "url" : "text"}
+                        className={FIELD}
+                        placeholder={q.type === "URL" ? "https://" : ""}
+                        value={value}
+                        onChange={(e) => set(e.target.value)}
+                        style={border}
+                      />
+                    ) : (
+                      <textarea
+                        rows={4}
+                        className={`${FIELD} resize-y leading-[1.65]`}
+                        value={value}
+                        onChange={(e) => set(e.target.value)}
+                        style={border}
+                      />
+                    )}
+                  </Field>
+                );
+              })}
             </>
           ) : null}
 
