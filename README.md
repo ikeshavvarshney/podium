@@ -124,7 +124,7 @@ port 5433.
 The suite refuses to run unless `DATABASE_URL` points at a database whose name ends in
 `_test`, so a test run cannot truncate development data.
 
-Current coverage: 417 tests across 35 files, unit and integration: authentication
+Current coverage: 436 tests across 36 files, unit and integration: authentication
 (password and passwordless), device sessions, scoped API tokens and instance secrets,
 event-scoped RBAC, cross-event isolation, role grants and revocation, private-event visibility,
 team formation and the team board, invite-link handling, submission lifecycle, gallery search and
@@ -156,7 +156,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the request path and
 
 ## Tier status
 
-Claimed honestly in `.dogfood.toml`: T1, T2, T3 and T4. The organisers' checker (`run.py`) verifies T1 and T2, all seven probes passing in [acceptance-report.txt](acceptance-report.txt); it has no T3 or T4 probes, so those claims rest on the 417 integration and unit tests and on the manual walkthrough in [docs/MANUAL-TESTING.md](docs/MANUAL-TESTING.md).
+Claimed honestly in `.dogfood.toml`: T1, T2, T3 and T4. The organisers' checker (`run.py`) verifies T1 and T2, all seven probes passing in [acceptance-report.txt](acceptance-report.txt); it has no T3 or T4 probes, so those claims rest on the 436 integration and unit tests and on the manual walkthrough in [docs/MANUAL-TESTING.md](docs/MANUAL-TESTING.md).
 
 | Tier | Status |
 | --- | --- |
