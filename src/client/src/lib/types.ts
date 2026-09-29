@@ -33,6 +33,8 @@ export interface EventSummary {
   status: EventStatus;
   visibility?: "PUBLIC" | "UNLISTED" | "PRIVATE";
   themeTags: string[];
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
   submissionDeadline: string | null;
   submissionsOpenAt?: string | null;
   registrationClosesAt?: string | null;
@@ -72,9 +74,17 @@ export interface CustomQuestion {
   stage?: "REGISTRATION" | "SUBMISSION";
   prompt: string;
   helpText: string | null;
+  type?: QuestionType;
+  options?: string[];
   required: boolean;
   publicAnswer: boolean;
 }
+
+export type QuestionType = "SHORT_TEXT" | "LONG_TEXT" | "URL" | "SELECT" | "MULTI_SELECT" | "BOOLEAN";
+
+/** Standard registration fields an organizer sets to required, optional or not asked. */
+export type RegistrationField = "org" | "currentRole" | "track" | "experience" | "skills";
+export type FieldRule = "required" | "optional" | "off";
 
 export interface EventPerson {
   id: string;
@@ -121,6 +131,7 @@ interface Viewer {
 
 export interface EventDetail extends EventSummary {
   description: string | null;
+  registrationFields?: Partial<Record<RegistrationField, FieldRule>>;
   eligibility: string;
   minTeamSize: number;
   maxTeamSize: number;

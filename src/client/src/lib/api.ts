@@ -1,3 +1,5 @@
+import { PHOTO_BOX, shrinkImage, type ImageBox } from "@/lib/image";
+
 /**
  * Thin API client. Credentials travel in the HTTP-only session cookie, so
  * nothing here ever touches a token.
@@ -54,10 +56,16 @@ export const patch = <T>(path: string, data: unknown) =>
   api<T>(path, { method: "PATCH", body: JSON.stringify(data) });
 export const del = <T>(path: string) => api<T>(path, { method: "DELETE" });
 
-/** Uploads one image file and returns the link to store on a submission. */
-export const uploadImage = (file: File, event?: string) =>
+/** Shrinks one image to the box, uploads it and returns its link. */
+export const uploadImage = async (file: File, event?: string, box: ImageBox = PHOTO_BOX) =>
   api<{ id: string; url: string }>(`/uploads${event ? `?event=${encodeURIComponent(event)}` : ""}`, {
     method: "POST",
-    body: file,
+    body: await shrinkImage(file, box),
     headers: { "Content-Type": "application/octet-stream" },
   });
+
+/** Points an upload link at the address this instance is served from now. */
+export function mediaUrl(url: string): string {
+  const m = /\/api\/uploads\/([0-9a-f-]{36})$/i.exec(url);
+  return m ? `${BROWSER_BASE.replace(/\/$/, "")}/api/uploads/${m[1]}` : url;
+}
