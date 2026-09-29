@@ -176,7 +176,7 @@ that backs the claim.
 *Attack:* judges coordinate, or a judge favours a friend.
 
 - **Reduced.** A judge is never assigned their own team's project (`assignment` refuses it), and
-  track scope narrows what a judge can be assigned or read. Judges cannot see each other's scores
+  a judge can only score what the organizers assigned. Judges cannot see each other's scores
   (isolation is enforced in the API, see above), so they cannot copy a running total or react to
   it. Each project is read by several judges, and per-judge normalization limits how far one
   harsh or generous judge moves a ranking. The organizer can see each judge's mean and spread in
@@ -189,6 +189,17 @@ that backs the claim.
 - **Not addressed.** Relationships beyond a shared organization are not modelled, and on a small
   panel two coordinating judges who vary their scores just enough can stay under every threshold.
 
+### An over-trusted admin
+
+*Attack:* an admin given one job (posting announcements, say) uses the API to change settings,
+read ballots, or promote themselves.
+
+- **Stopped.** Each admin carries the organizer areas it was granted, or full access. Every
+  organizer route requires its area on the server, and reads of hidden data (unpublished
+  results, live vote tallies, drafts, hidden comments) require the matching area too. Only the
+  owner or a full-access admin can add admins or change their access, so an admin cannot grant
+  themselves more.
+
 ### Malicious uploads
 
 *Attack:* upload a file that runs script in the platform's origin, or fill the disk.
@@ -196,7 +207,9 @@ that backs the claim.
 - **Stopped.** The type comes from the file's first bytes, not the client's header: only PNG, JPEG,
   GIF and WebP are accepted, so SVG and HTML never get in. Served files carry
   `X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src 'none'; sandbox`.
-- **Reduced.** Each file is at most 2 MB and each person 50 MB a day, behind the write limit.
+- **Reduced.** Each file is at most 2 MB and each person 50 MB a day, behind the write limit. The
+  browser shrinks images before upload, a repeat upload of the same file is reused, and uploads
+  tied to no event are deleted after a day.
 
 ### Deadline gaming
 
@@ -205,8 +218,8 @@ that backs the claim.
 - **Stopped.** Every mutating submission route re-evaluates `submissionWindow(event)` against the
   server clock. A write outside the window is refused and audited (`SUBMISSION_EDIT_REJECTED`).
   Client time is never read. Locked submissions refuse writes from the team.
-- **Remaining path.** An event admin can move a deadline or unlock, which is by design and is
-  recorded in the audit log with the actor and the old and new values.
+- **Remaining path.** An event admin with the Event settings area can move a deadline or unlock,
+  which is by design and is recorded in the audit log with the actor and the old and new values.
 
 ## Known limitations
 

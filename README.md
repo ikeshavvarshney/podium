@@ -124,7 +124,7 @@ port 5433.
 The suite refuses to run unless `DATABASE_URL` points at a database whose name ends in
 `_test`, so a test run cannot truncate development data.
 
-Current coverage: 436 tests across 36 files, unit and integration: authentication
+Current coverage: 438 tests across 38 files, unit and integration: authentication
 (password and passwordless), device sessions, scoped API tokens and instance secrets,
 event-scoped RBAC, cross-event isolation, role grants and revocation, private-event visibility,
 team formation and the team board, invite-link handling, submission lifecycle, gallery search and
@@ -156,7 +156,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the request path and
 
 ## Tier status
 
-Claimed honestly in `.dogfood.toml`: T1, T2, T3 and T4. The organisers' checker (`run.py`) verifies T1 and T2, all seven probes passing in [acceptance-report.txt](acceptance-report.txt); it has no T3 or T4 probes, so those claims rest on the 436 integration and unit tests and on the manual walkthrough in [docs/MANUAL-TESTING.md](docs/MANUAL-TESTING.md).
+Claimed honestly in `.dogfood.toml`: T1, T2, T3 and T4. The organisers' checker (`run.py`) verifies T1 and T2, all seven probes passing in [acceptance-report.txt](acceptance-report.txt); it has no T3 or T4 probes, so those claims rest on the 438 integration and unit tests and on the manual walkthrough in [docs/MANUAL-TESTING.md](docs/MANUAL-TESTING.md).
 
 | Tier | Status |
 | --- | --- |
@@ -175,23 +175,31 @@ Claimed honestly in `.dogfood.toml`: T1, T2, T3 and T4. The organisers' checker 
 - Token revocation via a per-user token version, on password change and on demand
 - Profile self-service: name, organization, pronouns, bio, link, avatar colour,
   in-app notification preferences, own activity feed
-- Event creation wizard, editing, timeline validation, publication and visibility
-- Event-scoped participant / judge / admin roles, with judge track scoping
+- Event creation wizard: required basics, a square logo and a banner, round cards for
+  registration, submissions and judging plus any rounds the organizer adds, and a
+  registration-form step; then editing, timeline validation, publication and visibility
+- Event-scoped participant / judge / admin roles, with admins limited to chosen areas or given full access
 - Tracks, prizes, organizer-defined custom questions staged by registration or submission
-- Registration: team-or-solo, experience, skills, agreements
+- Registration: team-or-solo, and a form the organizer shapes: organization, role, track,
+  experience and skills each required, optional or off, plus custom questions (short or long
+  answer, link, single or multiple choice, yes or no), and the rules and code of conduct
 - Team formation, invite links (stored hashed, shown once), transfer and leave
 - Team board: seekers list themselves, teams list open seats, a join-request handshake
   on both sides
 - Submissions: draft, edit, submit, withdraw, organizer lock, full version history
+- Flagging: an organizer removes a project from public view with a reason; it leaves the
+  gallery, judge queues, voting, results and winners but stays stored, and can be restored
 - Server-side deadline enforcement, with rejected edits written to the audit log
 - Public gallery with search, track filter, tag filter and facets
-- Organizer-authored event rounds/timeline and FAQ
+- Organizer-authored event rounds/timeline and FAQ; rounds open and close from the Rounds
+  page, each change confirmed
+- Every time is shown in UTC and every amount in US dollars
 - Configurable weighted rubrics, refused unless the weights total exactly 100
 - Comparative (pairwise) judging as an alternative to rubric scoring: judges order small
   groups of projects, ranked by a Bradley-Terry fit of the pairwise wins (Borda shown beside it).
   See `JUDGING.md`.
 - Judge assignment: manual, and a deterministic least-loaded auto-balancer that respects
-  track scope, the review target and the no-self-review rule
+  the review target and the no-self-review rule
 - Judging console with per-criterion scoring; the weighted total is computed server-side
 - Judge isolation: a judge reads only their own queue and their own ballots
 - Organizer progress dashboard: who has started, who has not, coverage per project
@@ -216,16 +224,18 @@ Claimed honestly in `.dogfood.toml`: T1, T2, T3 and T4. The organisers' checker 
   refused; every attempt is recorded and any delivery can be retried from the settings page
 - Signed, publicly verifiable judge participation records, and an embeddable public
   gallery for an event
-- Participation certificates
+- Certificates once the winners are announced: participation for everyone, achievement for
+  the top three and track winners, downloadable as PNG or PDF and verifiable at `/verify`
 
 ### Known limitations
 
 - Webhook retries stop after six attempts over about two and a half hours; after that a
   delivery is marked failed and waits for a manual retry.
 - Collusion checks flag lockstep judge pairs, outlier ballots and same-organization assignments, but cannot prove intent, and the gallery's read limit slows a crawler rather than stopping one spread across many addresses; see [docs/SECURITY.md](docs/SECURITY.md).
-- Uploads are images only (PNG, JPEG, GIF, WebP, 2 MB each, 50 MB per person per day) and live in
-  Postgres, which suits a hackathon's few hundred images; a much larger archive would want object
-  storage.
+- Uploads are images only (PNG, JPEG, GIF, WebP, 2 MB each after the browser shrinks them to
+  WebP, 50 MB per person per day) and live in Postgres, which suits a hackathon's few hundred
+  images; a much larger archive would want object storage. An identical re-upload is reused,
+  and uploads never tied to an event are deleted after a day.
 - Email goes out only when `SMTP_URL` points at a mail server. Without one (the offline default)
   sign-in links and voting codes are written to the API log for the operator to relay, and team
   invite links are shown on-screen. Accounts created by a roster import sign in by link.

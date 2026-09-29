@@ -75,19 +75,23 @@ flowchart LR
 
 ### `/events` and `/events/:eventId/...`
 
+Every organizer route needs the matching admin area (the owner and full-access admins have
+all of them); a missing area answers `403`.
+
 | Method | Path | Notes |
 | --- | --- | --- |
 | GET | `/events` | Public listing, with mode/eligibility/status/theme filters. |
-| POST | `/events` | Organizer capability required. A `slug` the organizer picks is used exactly (lowercased) or refused: `400` for a bad shape or reserved word, `409` with a `suggestion` if another event has it. Without one, a unique link is derived from the name. |
-| POST | `/uploads?event=` | Signed in. The raw image as the body. PNG, JPEG, GIF or WebP by content (SVG refused), up to 2 MB, 50 MB per person per day. Returns `{ id, url }`. |
+| POST | `/events` | Organizer capability required. Accepts `logoUrl`, `bannerUrl` and `registrationFields` (`org`, `currentRole`, `track`, `experience`, `skills`, each `required`, `optional` or `off`). A `slug` the organizer picks is used exactly (lowercased) or refused: `400` for a bad shape or reserved word, `409` with a `suggestion` if another event has it. Without one, a unique link is derived from the name. |
+| POST | `/uploads?event=` | Signed in. The raw image as the body. PNG, JPEG, GIF or WebP by content (SVG refused), up to 2 MB, 50 MB per person per day. Returns `{ id, url }`; the same file from the same person returns the existing upload. Uploads not tied to an event are deleted after a day. |
 | GET | `/uploads/:id` | Public. Served with `nosniff`, a sandboxing CSP and immutable caching. |
 | POST | `/events/import` | Organizer capability required. `{ data, slug? }` where `data` is an `export/event.json` from any podium instance. Creates a new event owned by the caller. See DATA-MODEL.md. |
 | GET | `/events/slug-availability?slug=` | Organizer capability required. `{ slug, available, reason?, suggestion? }`, for the wizard's live check. |
 | GET / PATCH | `/events/:eventId` | Private events 404 for non-members rather than 403, so their existence is not confirmed. |
-| POST | `/events/:eventId/register` | Public registration: team-or-solo, experience, skills, `REGISTRATION`-stage custom questions, agreements. |
-| `/tracks`, `/prizes`, `/members`, `/questions` | Standard CRUD, organizer/admin-only for writes. |
+| POST | `/events/:eventId/register` | Public registration: team-or-solo, experience, skills, `REGISTRATION`-stage custom questions, agreements. Standard fields the organizer made required are enforced here. |
+| `/tracks`, `/prizes`, `/members`, `/questions` | Standard CRUD, organizer/admin-only for writes. Prize and challenge amounts are USD only. `POST /members` with `role: ADMIN` and `PATCH /members/:id` with `{ permissions }` need full access; `permissions` is `["ALL"]` or any of `SETTINGS`, `ROUNDS`, `ROLES`, `JUDGING`, `RESULTS`, `VOTING`, `SUBMISSIONS`, `UPDATES`, `INTEGRATIONS`, `AUDIT`. |
 | `/teams`, `/teams/:teamId/invites` | Team creation, invite links (`token_hash` stored, plaintext shown once), transfer of ownership. |
 | `/submissions`, `/submissions/mine*` | Draft, submit, withdraw, version history. Every write re-checks `submissionWindow(event)` server-side. |
+| POST | `/submissions/:id/flag`, `/submissions/:id/restore` | Organizer-only. `flag` takes `{ reason }` and hides a submitted project from the gallery, judging, voting and results; `restore` brings it back. Both are audited. |
 | `/board`, `/board/requests` | Team-looking-for-people and people-looking-for-a-team listings, and the join-request handshake. |
 | `/rounds`, `/faq` | Organizer-authored event timeline and FAQ. |
 | `/updates`, `/updates/:id/read`, `/updates/read-all` | Announcements and per-user read receipts. |
@@ -126,7 +130,7 @@ flowchart LR
 | Method | Path | Notes |
 | --- | --- | --- |
 | POST | `/import/roster` | CSV with `email` and optional `name`, `team`. Creates missing accounts, grants the role, places participants on teams (creating them), and reports every row it could not place. |
-| GET | `/certificates/me`, `/certificates/summary` | Participation certificates. |
+| GET | `/certificates/me`, `/certificates/summary` | Signed certificates, issued once results are published or the event is archived (organizers may preview). `award` carries a top-three place and a track win from the published results. |
 | GET / POST / PATCH / DELETE | `/webhooks`, `/webhooks/:id` | Organizer-managed subscriptions to any event-scoped audit action, or `*` for all; `GET` lists what is available, recent attempts, and anything queued or failed. URLs that resolve to internal addresses are refused. |
 | POST | `/webhooks/:id/deliveries/:deliveryId/retry` | Re-queue one delivery and attempt it now. |
 

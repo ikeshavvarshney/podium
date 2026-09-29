@@ -27,7 +27,7 @@ erDiagram
         uuid event_id FK
         uuid user_id FK
         enum role "PARTICIPANT | JUDGE | ADMIN"
-        text_array track_scope
+        text_array permissions
     }
 ```
 
@@ -46,7 +46,7 @@ Making the role a property of the *relationship* removes the problem instead of 
 it. It also makes the authorization query the obvious one:
 
 ```sql
-SELECT role, track_scope
+SELECT role, permissions
 FROM event_memberships
 WHERE event_id = $1 AND user_id = $2;
 ```
@@ -59,9 +59,10 @@ The unique constraint is on `(event_id, user_id, role)` rather than `(event_id, 
 deliberately: an admin who also sits on the judging panel is a real and common case, so a
 user may hold several roles in one event but never the same role twice.
 
-`track_scope` lives on the membership rather than in a join table because it only ever
-qualifies a judge grant, it is read on every judge request, and it is small. A Postgres
-array is the honest representation of "these tracks, or all of them if empty".
+`permissions` lives on the membership rather than in a join table because it only ever
+qualifies an admin grant, it is read on every organizer request, and it is small: the
+organizer areas an admin may use, or `ALL` for full access. The event owner always has
+full access.
 
 ### What stays global
 
@@ -110,9 +111,9 @@ erDiagram
 
 | Table | Purpose |
 | --- | --- |
-| `events` | The unit of scope. Owns the full timeline; every deadline check reads these columns. `published_run_id` pins the normalization run the public sees, so a later run never changes published standings. |
-| `event_memberships` | The authorization spine, described above. |
-| `tracks` | Categories within an event. `restricted` marks tracks that require an explicit judge scope. |
+| `events` | The unit of scope. Owns the full timeline; every deadline check reads these columns. `published_run_id` pins the normalization run the public sees, so a later run never changes published standings. `logo_url` and `banner_url` point at uploads; `registration_fields` records which standard registration fields are required, optional or off. |
+| `event_memberships` | The authorization spine, described above. `permissions` limits an admin to organizer areas, or `ALL`. |
+| `tracks` | Categories within an event. |
 | `prizes` | Optionally attached to a track. |
 | `custom_questions` | Organizer-defined submission questions. `stage` (`REGISTRATION` or `SUBMISSION`) decides where a question is asked; `public_answer` decides whether the answer reaches the gallery. |
 | `registrations` | One row per person who registers for an event: experience level, skills, and answers to `REGISTRATION`-stage questions. |
@@ -130,7 +131,7 @@ erDiagram
 | `team_invites` | Only `token_hash` is stored; the plaintext is shown once at creation. Supports use limits, expiry and revocation. |
 | `seeker_listings` | A person looking for a team: track, pitch, skills, all scoped to one event. |
 | `join_requests` | The handshake between a seeker and a team: `direction` (seeker asking in, or team inviting) and `status`. Membership is only created once the other side accepts. |
-| `submissions` | One per team, enforced by `team_id UNIQUE`. `locked_at` is the organizer override that sits alongside the event deadline. |
+| `submissions` | One per team, enforced by `team_id UNIQUE`. `locked_at` is the organizer override that sits alongside the event deadline. A flagged project has status `DISQUALIFIED` with `flag_reason`, `flagged_at` and `flagged_by_id`; the row and its scores stay. |
 | `submission_images` | Ordered gallery images. |
 | `submission_custom_answers` | Unique per `(submission, question)`. |
 
@@ -160,7 +161,7 @@ erDiagram
 
 | Table | Purpose |
 | --- | --- |
-| `uploads` | Image bytes, type and SHA-256, owned by the uploader and optionally by an event. Kept in Postgres so there is no object store to run, and so backups and event exports carry the images. |
+| `uploads` | Image bytes, type and SHA-256, owned by the uploader and optionally by an event. Kept in Postgres so there is no object store to run, and so backups and event exports carry the images. The SHA-256 de-duplicates a person's repeat uploads; an event logo or banner is tied to its event when the event is saved, and uploads tied to no event are pruned after a day. |
 | `audit_logs` | Append-only by trigger, and hash-chained per event (`chain_seq`, `prev_hash`, `hash`). Carries a machine action, a readable summary, actor, event, target, metadata and a hashed IP. |
 | `webhooks` | An organizer-registered URL and secret, per event, subscribed to specific audit actions or to `*` (all of them). |
 | `webhook_outbox` | One row per notification owed to one webhook: the signed body, status (`PENDING`, `DELIVERED`, `FAILED`), attempts and the next attempt time. Its id is the delivery id receivers deduplicate on. |
@@ -216,7 +217,7 @@ the file.
 | --- | --- |
 | `event` | an `events` row in the JUDGING state; `submissions_close` becomes `submission_deadline`, so the event refuses new entries and edits |
 | `tracks` | `tracks` |
-| `judges` | `users` plus a JUDGE `event_memberships` row whose `track_scope` is the judge's tracks |
+| `judges` | `users` plus a JUDGE `event_memberships` row |
 | `teams` | `teams`, `team_members` (first member owns the team) and PARTICIPANT memberships |
 | `projects` | `submissions`, status SUBMITTED, with the file's `submitted_at` |
 | `scores` | a `judge_assignments` row and a `judge_scores` ballot with one `criterion_scores` row per criterion |
@@ -261,7 +262,7 @@ on this instance or any other:
   invite and API tokens and voter codes are left out.
 - The import runs in one transaction. It gives every row a new id and remaps every reference
   to it. Foreign keys are read from Prisma's schema metadata (DMMF), so a new table or column is
-  carried without touching the importer. Ids inside lists and JSON (track scopes, challenge ids,
+  carried without touching the importer. Ids inside lists and JSON (challenge ids,
   `user:` voter keys, audit metadata) are remapped too. People are matched by email, or created
   with no usable password, to sign in by link.
 - A normalization run that matched the source's ballots still matches after import, so a

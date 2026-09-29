@@ -62,7 +62,6 @@ Constraints:
 
 - every submission receives `reviews_per_submission` independent evaluations
 - judge workload stays balanced (no judge carries a disproportionate queue)
-- a track-restricted judge only receives submissions inside their `track_scope`
 - no judge is assigned a submission from their own team (self-review)
 - no judge is assigned the same submission twice, enforced by a unique constraint on
   `(judge_id, submission_id)` rather than by application code alone
@@ -218,8 +217,8 @@ Judging integrity depends on judges being unable to see each other's work.
   (or `me`) and to an event admin. Any other caller, including another judge, gets 403, and
   the attempt is written to the audit log as `ACCESS_DENIED`. This is the route the
   acceptance checker probes as judge B.
-- A track-restricted judge cannot read a submission outside their scope, including by
-  requesting it directly by id.
+- A judge cannot score a submission they were not assigned, including by requesting it
+  directly by id.
 - Aggregate scores are organizer-only until results are published.
 
 These boundaries get automated tests. A hidden button is not a boundary; the test is

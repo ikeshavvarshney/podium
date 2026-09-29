@@ -105,7 +105,7 @@ organizers only.
 | Vote in community voting | Allowed according to the event's access mode (open link, email-gated, or signed-in). You cannot back your own team's project. Judges and organizers of the event are excluded unless the organizer allows them |
 | See community results | Hidden until voting closes |
 | Read event updates, mark them read | Any account; organizers post them |
-| Draw a participation certificate | Any account holding a role in the event. The certificate carries a code that anyone can verify at `/verify` |
+| Get a certificate (**Get your certificate** on the event page, or **Certificate** on My events) | Any account holding a role in the event, once the winners are announced. Top three and track winners get a certificate of achievement. It downloads as PNG or PDF and carries a code anyone can verify at `/verify` |
 
 ### What a participant cannot do
 
@@ -129,8 +129,6 @@ What changes for that person in that event:
 - They keep their own submission out of their queue. The assignment engine never gives a
   judge a project from their own team, and a manual assignment of it is rejected.
 - They cannot cast community votes unless the organizer set the event to allow judges.
-- They may be limited to certain tracks (`track_scope`). Outside that scope, a project is
-  unreachable even by direct id.
 
 What does **not** change: a judge still cannot see another judge's scores, and cannot see
 aggregate scores until results are published.

@@ -99,7 +99,7 @@ Sign in as `odalys@verdanto.io`.
 4. Skip one project, then come back to it.
 5. Open an event where this account is not a judge. The judge screen should be blocked.
 6. In an event that uses ranking instead of scores, put the projects in order and submit.
-7. Open the **Certificate** page. Copy the signed record, open `/verify`, and paste it. It should say it is genuine. Change one letter and it should fail.
+7. On an event whose winners are announced, open **Certificate** (also on **My events**). Download the PNG and the PDF: each holds only the certificate. A top-three or track-winning team's member sees a certificate of achievement naming the place or track. Download the signed record, open `/verify`, and paste it. It should say it is genuine. Change one letter and it should fail. Before results are published the page refuses.
 8. Check that you cannot see other judges' scores or the organizer pages.
 
 ## 5. Organizer
@@ -108,9 +108,11 @@ Sign in as `emeline@podium.dev`.
 
 ### Create an event
 
-1. Go to `/events/new`. Fill in the steps: basics, dates, tracks, prizes, questions.
-2. Click **Save as draft**. The event should be hidden from the public.
-3. Reopen it and click **Publish event**. It should now show in the public list.
+1. Go to `/events/new`. Try to jump to **Review** from the step list with only a name: it stops at the first step with a missing required field (tagline, description, location, registration and submission end).
+2. Fill in the steps: basics with a square logo and a banner, the timeline's round cards (add a round, then delete it), tracks and prizes (amounts in USD), the registration form (set Skills to required, add a single-choice question with two options), rubric, judges (judges per project), review. All dates are entered in UTC.
+3. Click **Save as draft**. The event should be hidden from the public.
+4. Reopen it and click **Publish event**. It should now show in the public list, with its logo on the card and the banner on the event page.
+5. Register for it from another account: Skills is required, and the question shows as radio buttons.
 
 ### Event settings
 
@@ -123,12 +125,14 @@ Open the event, then **Settings**.
 5. **Webhooks:** add a URL subscribed to **all events**, do anything in the event (add a FAQ item, post an update), and check the delivery log. `http://169.254.169.254/` or `http://db:5432/` should be refused as internal. Point a hook at a dead URL: the delivery shows as retrying, and "retry now" sends it again.
 6. **Bulk import:** upload a CSV with `email,name,team` columns, including one address that has no account and two rows on the same team. The people should appear under **Roles**, the new account should exist, and the team should appear under **Teams**. A row for a full team is reported, not placed.
 7. **Exports:** download the CSV and JSON files. On **My events**, **Import event** takes that JSON and creates a copy that ranks exactly like the original.
-8. Add a round, a FAQ item and an announcement. Check that participants can see them.
+8. Add a round, a FAQ item and an announcement. Check that participants can see them. On **Rounds**, **Make live**, **Close now** and **Reopen previous** each ask to confirm first.
+9. In the gallery, open a submitted project and **Flag project** with a reason. It leaves the gallery, the judge's queue and the ballot; the team sees the reason on **My project**. **Restore** it from **Flagged projects** on the dashboard.
 
 ### Roles
 
-1. Open **Roles**. Make someone a judge, and limit them to one track. Make someone else an admin.
-2. Remove a role. That person should lose access.
+1. Open **Roles**. Make someone a judge. Make someone else an admin, and in **Manage access** give them only Announcements: they should see only the Updates tab.
+2. Remove a role, after the confirmation. That person should lose access.
+3. As the limited admin, try `PATCH /api/events/<event>` with curl: it is refused with 403. They cannot add admins or raise their own access.
 
 ### Judging
 
@@ -153,7 +157,7 @@ Open **Audit**. It should list sign ins, role changes, submissions, scores (a ch
 ### API tokens and uploads
 
 1. On **Profile**, create an API token limited to one event. `curl -H "Authorization: Bearer pod_..." localhost:4000/api/events/<that event>/progress` works; the same call on another event returns 401.
-2. On **My project**, upload a thumbnail. An SVG is refused.
+2. On **My project**, upload a thumbnail. An SVG is refused. A large photo is shrunk to WebP before it is sent, and uploading the same file again returns the same link.
 
 ## 6. Admin
 

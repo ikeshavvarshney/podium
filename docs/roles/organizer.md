@@ -35,8 +35,8 @@ flowchart TD
     O["Account with the organizer capability"]
     O -->|creates| E["Event"]
     E --> OW["Owner: implicit admin,\ncannot be revoked"]
-    OW -->|grants by email| AD["ADMIN\nco-organizer for this event"]
-    OW -->|grants by email| JU["JUDGE\noptional track scope"]
+    OW -->|grants by email| AD["ADMIN\nfull access or chosen areas"]
+    OW -->|grants by email| JU["JUDGE\nscores what is assigned"]
     OW -->|or imports a roster| PA["PARTICIPANT"]
     AD -->|same powers| JU
     PA -. "may also hold" .-> JU
@@ -50,8 +50,8 @@ gets a role by asking the server for it, and a client can never nominate its own
 | Role in an event | How an account gets it | Who can give it |
 | --- | --- | --- |
 | Participant | Registers, or accepts a team invite, or is imported from a roster | The account itself (within the rules the organizer set), or an event admin |
-| Judge | Granted by email, with an optional track scope | Event admin only |
-| Admin | Granted by email | Event admin only |
+| Judge | Granted by email | An admin with Judges and roster access |
+| Admin | Granted by email, then given full access or chosen areas | The owner or a full-access admin |
 
 Granting a single role by email requires the account to **already exist**: the platform
 does not email invitations, so an unknown address is reported back rather than invited. A roster
@@ -60,17 +60,25 @@ never the same role twice.
 
 ## What an organizer can do
 
-Every action below is enforced on the server as "event admin of this event". A hidden
-button is not the boundary; a direct API request from a non-admin receives an
-authorization failure.
+Every action below is enforced on the server as "event admin of this event, with access to
+this area". The owner and full-access admins have every area; a limited admin has only the
+areas granted in **Manage access**. A hidden button is not the boundary; a direct API
+request without the area receives an authorization failure.
 
 ### Create and configure the event
 
 - **Create an event** (needs the organizer capability): name, the event link (the part after
   `/events/`, checked live against every other event as you type), tagline, a Markdown
   description with a preview, theme tags, visibility (public, unlisted or private),
-  timezone, mode and place, team size limits, eligibility, reviews per submission.
-  Timeline dates must be coherent.
+  mode and place, a square logo and a banner, team size limits, eligibility, and judges per
+  project (the Auto-balance target; assignments by hand can go above or below it). The
+  wizard requires a tagline, a description, a location unless the event is online, and an
+  end for registration and for submissions. Its **Timeline** step shows registration,
+  submissions and judging as round cards and lets the organizer add or delete more rounds;
+  its **Registration form** step sets each standard field to required, optional or off and
+  adds custom questions (short or long answer, link, single or multiple choice, yes or no).
+  Timeline dates must be coherent. Every time is entered and shown in UTC, and every amount
+  in US dollars.
 - **Edit everything later** (`/events/[slug]/settings`): the same fields, plus status.
 - **Dates**: registration open and close, submissions open and deadline, judging open and
   close, voting open and close, all editable from settings. Each is enforced by the server
@@ -96,9 +104,11 @@ A **private** event is invisible, returning "not found", to anyone with no membe
   CSV roster with `email`, `name` and (for participants) `team` columns, up to 1,000 rows at
   a time. New addresses get an account, named teams are created, and invalid rows or
   people who cannot be placed (already on a team, team full) are reported.
-- Give a judge a **track scope**, so they only ever see submissions in those tracks, and
-  change it later. An empty scope means all tracks.
-- Revoke a role. The owner's own admin role is protected and cannot be revoked.
+- Choose what each admin can do with **Manage access**: full access, or any of ten areas
+  (event settings, rounds, judges and roster, judging, results, community voting,
+  submissions, announcements, integrations and exports, audit log). A new admin starts
+  with none. Only the owner or a full-access admin can add admins or change their access.
+- Revoke a role, after a confirmation. The owner's own admin role is protected and cannot be revoked.
 - Every grant and revoke is written to the audit log.
 
 ### Teams and submissions
@@ -106,6 +116,9 @@ A **private** event is invisible, returning "not found", to anyone with no membe
 - View every team and every submission, including drafts (`/submissions/all`).
 - **Lock** a submission so it can no longer be edited. Locked writes are refused and
   audited.
+- **Flag** a submitted project with a reason, from its gallery card. It leaves the gallery,
+  judge queues, community voting, results and winners, but stays stored with its scores; the
+  team sees the reason and cannot edit or resubmit. **Restore** it from the dashboard.
 - Moderate comments: **hide** a comment (kept for the record, hidden from the public,
   with an optional reason).
 
@@ -115,7 +128,7 @@ A **private** event is invisible, returning "not found", to anyone with no membe
   choose (5 by default) (`/events/[slug]/settings`), or comparative mode with a group size. The rubric is **locked once any ballot exists**,
   because changing a weight would silently rewrite cast ballots.
 - **Assignment** (`/events/[slug]/assign`): generate automatically (balanced across the
-  panel, honouring track scope, never giving a judge their own team's project), assign or
+  panel, never giving a judge their own team's project), assign or
   remove individual pairs by hand, or clear all. An assignment that has already been scored
   cannot be removed.
 - **Progress** (`/events/[slug]/manage`): who has not started, who is behind, which projects
@@ -150,7 +163,12 @@ A **private** event is invisible, returning "not found", to anyone with no membe
   event as JSON.
 - **Webhooks**: HMAC-signed, for any audited action in the event (or all of them), with a
   delivery log.
-- **Certificates**: see who took part and issue certificates.
+- **Certificates**: issued once the winners are announced. Everyone who took part gets a
+  certificate of participation; the top three and each track winner get a certificate of
+  achievement naming the place or track. Each downloads as PNG or PDF and verifies at `/verify`.
+- **Rounds** (`/events/[slug]/rounds`): make a round live, close a live round now, or reopen
+  the previous one; each asks for confirmation. Rounds are the published schedule; the
+  submission and judging windows follow the event dates.
 
 ## What an organizer cannot do
 
@@ -159,7 +177,7 @@ A **private** event is invisible, returning "not found", to anyone with no membe
 - **Read another judge's private work as that judge.** Admin access is a separate,
   organizer-only view; it does not impersonate a judge.
 - **Change the rubric after scoring starts.**
-- **Assign a judge their own team's project**, or a project outside their track scope.
+- **Assign a judge their own team's project.**
 - **Remove a scored assignment.**
 - **Edit a submission's content for the team.** Organizers lock; teams write.
 - **Lock themselves out.** The owner's admin role cannot be revoked.
@@ -170,24 +188,25 @@ A **private** event is invisible, returning "not found", to anyone with no membe
 | Capability | Owner | Event admin | Judge | Participant |
 | --- | :-: | :-: | :-: | :-: |
 | Create an event | yes, with the organizer capability | no | no | no |
-| Edit settings, dates, tracks, prizes, questions, rounds | yes | yes | no | no |
-| Grant and revoke roles, set track scope | yes | yes | no | no |
-| Import a roster | yes | yes | no | no |
-| Configure the rubric (until first ballot) | yes | yes | no | no |
-| Generate and edit assignments | yes | yes | no | no |
+| Edit settings, dates, tracks, prizes, questions | yes | with Event settings | no | no |
+| Open, close and schedule rounds | yes | with Rounds | no | no |
+| Grant and revoke judges, import a roster | yes | with Judges and roster | no | no |
+| Add admins and choose their access | yes | with full access | no | no |
+| Configure the rubric (until first ballot), assignments, progress | yes | with Judging | no | no |
 | Score assigned projects | only if also a judge | only if also a judge | yes, own queue | no |
-| Read all scores and progress | yes | yes | no | no |
-| Run normalization, publish results | yes | yes | no | no |
-| Configure voting, see live tallies | yes | yes | no | no |
-| Lock a submission, hide a comment | yes | yes | no | no |
-| Export data, read audit log, manage webhooks | yes | yes | no | no |
+| Run normalization, publish results | yes | with Results | no | no |
+| Configure voting, see live tallies | yes | with Community voting | no | no |
+| Lock or flag a submission, hide a comment | yes | with Submissions | no | no |
+| Post announcements | yes | with Announcements | no | no |
+| Export data, manage webhooks | yes | with Integrations and exports | no | no |
+| Read the audit log | yes | with Audit log | no | no |
 | Revoke the owner's admin role | never | never | never | never |
 
 ## Running an event, in order
 
 1. **Create** the event (draft). Set dates, tracks, prizes, custom questions.
 2. **Configure the rubric.** Weights total 100.
-3. **Grant judge roles** by email, with track scopes if needed. Optionally add co-admins.
+3. **Grant judge roles** by email. Optionally add co-admins and choose their access.
 4. **Open registration.** Participants register or join by invite.
 5. **Open submissions.** Teams draft and submit. Watch the dashboard for empty teams.
 6. **Assign judges.** Generate, review the balance, adjust by hand.

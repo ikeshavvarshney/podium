@@ -44,7 +44,7 @@ sequenceDiagram
     M->>E: authenticated user
     E->>E: resolve :eventId (uuid or slug) -> load event
     E->>E: load THIS user's memberships FOR THIS event
-    E->>E: derive isOwner, isEventAdmin, isJudge, isParticipant, trackScope
+    E->>E: derive isOwner, isEventAdmin, permissions, isJudge, isParticipant
     E->>E: assertEventVisible (private events 404 for non-members)
     E->>R: event context
     R->>R: throws 403 unless the derived context allows it
@@ -111,14 +111,15 @@ admin, is a row in `event_memberships`.
 ```mermaid
 flowchart TD
     U["User\nglobal: identity, organizer capability"]
-    U --> M1["EventMembership\nevent A, role JUDGE, track_scope []"]
+    U --> M1["EventMembership\nevent A, role JUDGE"]
     U --> M2["EventMembership\nevent B, role PARTICIPANT"]
     U --> M3["EventMembership\nevent C, role ADMIN"]
 ```
 
 `isEventAdmin` is true for the event owner, for an `ADMIN` membership, or for the
-instance operator. Judges carry an optional `track_scope`: an empty array means every
-track, a populated one means the judge can only ever see submissions in those tracks.
+instance operator. An admin membership also carries `permissions`: the organizer areas
+it may use, or `ALL`. Every organizer route requires its area. Judges see only the
+projects the organizers assign them.
 
 Ownership checks stack on top of role checks. Being a participant lets you edit *a*
 submission; being on the owning team is what lets you edit *that* submission. Both are
