@@ -36,7 +36,7 @@ export function ParticipantPanel({ event }: { event: EventSummary }) {
     ? "Checking..."
     : data.submission
       ? (SUBMISSION_LABEL[data.submission.status] ?? data.submission.status)
-      : "Not started";
+      : "None yet";
 
   return (
     <section aria-label="Your status" className="rounded-[10px] border border-line bg-surface p-4">

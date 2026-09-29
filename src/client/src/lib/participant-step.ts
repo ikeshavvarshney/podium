@@ -1,4 +1,5 @@
 import type { EventSummary } from "@/lib/types";
+import { utcDateTime } from "@/lib/format";
 
 /** Where an event sits for one person: something to do now, waiting on others, or finished. */
 export type Phase = "act" | "wait" | "done";
@@ -35,15 +36,9 @@ export function timeLeft(ms: number): string {
   return `${Math.floor(ms / DAY)} days`;
 }
 
-/** A deadline to the minute, in the viewer's zone, because these are decided to the hour. */
+/** A deadline to the minute, in UTC like every time on the platform. */
 export function formatDeadline(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  });
+  return utcDateTime(iso, { month: "short", day: "numeric" });
 }
 
 function deadlineLine(label: string, iso: string | null, now: number | null): string | null {
@@ -142,7 +137,7 @@ function participantStep(event: EventSummary, data: StepData, now: number | null
     sentence = "Your draft is saved but not submitted.";
     action = { ...submit, label: "Finish and submit" };
   } else {
-    sentence = "You have not started your submission.";
+    sentence = "Submissions are open. You have not started yours yet.";
     action = { ...submit, label: "Start my submission" };
   }
   if (data.loaded && data.team && members < min) {

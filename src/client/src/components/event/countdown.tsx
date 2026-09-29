@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 
 function format(ms: number): string {
-  if (ms <= 0) return "0:00:00:00";
+  if (ms <= 0) return "0s";
   const total = Math.floor(ms / 1000);
   const days = Math.floor(total / 86400);
-  const hours = String(Math.floor((total % 86400) / 3600)).padStart(2, "0");
+  const hours = Math.floor((total % 86400) / 3600);
   const minutes = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
   const seconds = String(total % 60).padStart(2, "0");
-  return `${days}:${hours}:${minutes}:${seconds}`;
+  return `${days > 0 ? `${days}d:` : ""}${hours}h:${minutes}m:${seconds}s`;
 }
 
 /**
@@ -43,7 +43,7 @@ export function Countdown({ deadline, label }: { deadline: string; label: string
         {format(remaining)}
       </span>
       <span className="whitespace-nowrap font-mono text-label uppercase tracking-stamp text-muted">
-        days:hrs:min:sec left
+        left
       </span>
     </div>
   );
