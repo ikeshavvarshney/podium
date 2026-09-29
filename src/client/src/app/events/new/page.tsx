@@ -3,20 +3,24 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ApiError, get, patch, post, put } from "@/lib/api";
+import { ApiError, get, mediaUrl, patch, post, put, uploadImage } from "@/lib/api";
+import { BANNER_BOX, LOGO_BOX } from "@/lib/image";
 import { slugify, type SlugCheck } from "@/lib/slug";
 import { DEFAULT_CRITERIA, DEFAULT_SCALE, clampScale } from "@/lib/rubric";
 import { ScalePicker } from "@/components/event/scale-picker";
 import { ShareLink } from "@/components/event/share-link";
 import { hue } from "@/lib/hues";
+import type { FieldRule, QuestionType, RegistrationField } from "@/lib/types";
 import { Notice } from "@/components/ui/notice";
 import { Field } from "@/components/ui/field";
 import { MarkdownEditor } from "@/components/ui/markdown-editor";
+import { fromUtcInput } from "@/lib/format";
 
 const STEPS = [
   { label: "Basics", note: "Name it and say what it is for." },
-  { label: "Timeline", note: "Set the windows the server will enforce." },
+  { label: "Timeline", note: "Plan the rounds and when each one runs." },
   { label: "Tracks & prizes", note: "Group the submissions and reward them." },
+  { label: "Registration form", note: "Choose what participants fill in when they register." },
   { label: "Rubric", note: "Decide what every evaluation is scored against." },
   { label: "Judges", note: "Choose who judges, and who may see the event." },
   { label: "Review", note: "Check everything before the draft is created." },
@@ -36,6 +40,58 @@ interface PrizeRow {
   title: string;
   amount: string;
 }
+
+interface CustomRound {
+  name: string;
+  kind: RoundKind;
+  opensAt: string;
+  closesAt: string;
+}
+
+type RoundKind = "PITCH" | "SCORING" | "QUIZ" | "VOTE" | "RESULT";
+
+const ROUND_KINDS: Array<{ id: RoundKind; label: string }> = [
+  { id: "PITCH", label: "Pitch" },
+  { id: "SCORING", label: "Scoring" },
+  { id: "QUIZ", label: "Quiz" },
+  { id: "VOTE", label: "Vote" },
+  { id: "RESULT", label: "Result" },
+];
+
+interface FormQuestion {
+  prompt: string;
+  type: QuestionType;
+  options: string[];
+  helpText: string;
+  required: boolean;
+}
+
+const STANDARD_FIELDS: Array<{ key: RegistrationField; label: string; note: string }> = [
+  { key: "org", label: "Organization or university", note: "Saved on the participant's account." },
+  { key: "currentRole", label: "Current role", note: "Student, engineer, researcher..." },
+  { key: "track", label: "Track", note: "Only asked when the event has tracks." },
+  { key: "experience", label: "Hackathon experience", note: "First event, 2-5, or 6 or more." },
+  { key: "skills", label: "Skills", note: "Used for teammate matching on the team board." },
+];
+
+const DEFAULT_FIELD_RULES: Record<RegistrationField, FieldRule> = {
+  org: "optional",
+  currentRole: "optional",
+  track: "optional",
+  experience: "optional",
+  skills: "optional",
+};
+
+const QUESTION_TYPES: Array<{ id: QuestionType; label: string }> = [
+  { id: "SHORT_TEXT", label: "Short answer" },
+  { id: "LONG_TEXT", label: "Paragraph" },
+  { id: "URL", label: "Link" },
+  { id: "SELECT", label: "Single choice (radio)" },
+  { id: "MULTI_SELECT", label: "Multiple choice (checkboxes)" },
+  { id: "BOOLEAN", label: "Yes or no" },
+];
+
+const hasOptions = (t: QuestionType) => t === "SELECT" || t === "MULTI_SELECT";
 
 interface CriterionRow {
   label: string;
@@ -77,10 +133,19 @@ export default function CreateEventPage() {
   const [tried, setTried] = useState(false);
   const [restored, setRestored] = useState(false);
 
+  const [registrationOpensAt, setRegistrationOpensAt] = useState("");
   const [registrationClosesAt, setRegistrationClosesAt] = useState("");
   const [submissionsOpenAt, setSubmissionsOpenAt] = useState("");
   const [submissionDeadline, setSubmissionDeadline] = useState("");
+  const [judgingOpensAt, setJudgingOpensAt] = useState("");
   const [judgingClosesAt, setJudgingClosesAt] = useState("");
+  const [customRounds, setCustomRounds] = useState<CustomRound[]>([]);
+  const [logoUrl, setLogoUrl] = useState("");
+  const [bannerUrl, setBannerUrl] = useState("");
+  const [uploading, setUploading] = useState<"" | "logo" | "banner">("");
+  const [uploadError, setUploadError] = useState("");
+  const [fieldRules, setFieldRules] = useState<Record<RegistrationField, FieldRule>>(DEFAULT_FIELD_RULES);
+  const [formQuestions, setFormQuestions] = useState<FormQuestion[]>([]);
   const [teamMin, setTeamMin] = useState(1);
   const [teamMax, setTeamMax] = useState(4);
 
@@ -119,10 +184,17 @@ export default function CreateEventPage() {
         setThemeTags(d.themeTags ?? []);
         setMode(d.mode ?? "HYBRID");
         setPlace(d.place ?? "");
+        setRegistrationOpensAt(d.registrationOpensAt ?? "");
         setRegistrationClosesAt(d.registrationClosesAt ?? "");
         setSubmissionsOpenAt(d.submissionsOpenAt ?? "");
         setSubmissionDeadline(d.submissionDeadline ?? "");
+        setJudgingOpensAt(d.judgingOpensAt ?? "");
         setJudgingClosesAt(d.judgingClosesAt ?? "");
+        setCustomRounds(d.customRounds ?? []);
+        setLogoUrl(d.logoUrl ?? "");
+        setBannerUrl(d.bannerUrl ?? "");
+        if (d.fieldRules) setFieldRules({ ...DEFAULT_FIELD_RULES, ...d.fieldRules });
+        setFormQuestions(d.formQuestions ?? []);
         setTeamMin(d.teamMin ?? 1);
         setTeamMax(d.teamMax ?? 4);
         setTracks(d.tracks ?? []);
@@ -147,8 +219,8 @@ export default function CreateEventPage() {
         DRAFT_KEY,
         JSON.stringify({
           name, slug, slugEdited, tagline, description, themeTags, mode, place,
-          registrationClosesAt, submissionsOpenAt, submissionDeadline, judgingClosesAt,
-          teamMin, teamMax, tracks, prizes, criteria, scale, judges, eligibility, visibility,
+          registrationOpensAt, registrationClosesAt, submissionsOpenAt, submissionDeadline, judgingOpensAt,
+          judgingClosesAt, customRounds, logoUrl, bannerUrl, fieldRules, formQuestions, teamMin, teamMax, tracks, prizes, criteria, scale, judges, eligibility, visibility,
           reviewsPerSubmission,
         }),
       );
@@ -157,8 +229,8 @@ export default function CreateEventPage() {
     }
   }, [
     restored, name, slug, slugEdited, tagline, description, themeTags, mode, place,
-    registrationClosesAt, submissionsOpenAt, submissionDeadline, judgingClosesAt,
-    teamMin, teamMax, tracks, prizes, criteria, scale, judges, eligibility, visibility,
+    registrationOpensAt, registrationClosesAt, submissionsOpenAt, submissionDeadline, judgingOpensAt,
+    judgingClosesAt, customRounds, logoUrl, bannerUrl, fieldRules, formQuestions, teamMin, teamMax, tracks, prizes, criteria, scale, judges, eligibility, visibility,
     reviewsPerSubmission,
   ]);
 
@@ -191,34 +263,89 @@ export default function CreateEventPage() {
     };
   }, [slug]);
 
-  const stepError = useMemo(() => {
-    if (step === 0) {
+  function problemFor(i: number): string {
+    if (i === 0) {
       if (!name.trim()) return "An event name is required.";
       if (!slug) return "The event needs a link.";
       if (slugCheck === "checking") return "Checking the event link...";
       if (slugCheck && !slugCheck.available) return `Choose another event link: ${slugCheck.reason}`;
+      if (!tagline.trim()) return "A tagline is required: it is the line shown in the listing.";
+      if (!description.trim()) return "A description is required: say who it is for and what to build.";
+      if (mode !== "ONLINE" && !place.trim()) return "A location is required for an in-person or hybrid event.";
+      if (uploading) return "Wait for the image to finish uploading.";
       return "";
     }
-    if (step === 1) {
-      if (!submissionDeadline) return "A submission deadline is required: the server enforces it.";
+    if (i === 1) {
+      if (!registrationClosesAt) return "The Registration round needs an end, so people know the last day to sign up.";
+      if (!submissionDeadline) return "The Submissions round needs an end: the server enforces the deadline.";
+      const backwards = [
+        { name: "Registration", start: registrationOpensAt, end: registrationClosesAt },
+        { name: "Submissions", start: submissionsOpenAt, end: submissionDeadline },
+        { name: "Judging", start: judgingOpensAt, end: judgingClosesAt },
+        ...customRounds.map((r) => ({ name: r.name.trim() || "A new round", start: r.opensAt, end: r.closesAt })),
+      ].find((r) => r.start && r.end && new Date(r.start) >= new Date(r.end));
+      if (backwards) return `${backwards.name} must end after it starts.`;
+      if (customRounds.some((r) => !r.name.trim())) return "Every added round needs a name.";
       if (teamMin < 1 || teamMax < teamMin) return "Team size must run from at least 1 upwards.";
       return "";
     }
-    if (step === 3) {
+    if (i === 3) {
+      if (formQuestions.some((q) => !q.prompt.trim())) return "Every question needs its text.";
+      if (formQuestions.some((q) => hasOptions(q.type) && q.options.filter((o) => o.trim()).length < 2)) {
+        return "A choice question needs at least two options.";
+      }
+      return "";
+    }
+    if (i === 4) {
       if (criteria.some((c) => !c.label.trim())) return "Every criterion needs a name.";
       if (weightSum !== 100) return `Weights total ${weightSum}%. They must total exactly 100%.`;
       return "";
     }
     return "";
-  }, [step, name, slug, slugCheck, submissionDeadline, teamMin, teamMax, criteria, weightSum]);
+  }
+
+  /** The first step before `until` that still has a missing required field. */
+  function firstProblem(until: number): { step: number; message: string } | null {
+    for (let i = 0; i < until; i++) {
+      const message = problemFor(i);
+      if (message) return { step: i, message };
+    }
+    return null;
+  }
+
+  const stepError = problemFor(step);
+
+  async function upload(kind: "logo" | "banner", file: File | undefined) {
+    if (!file) return;
+    setUploading(kind);
+    setUploadError("");
+    try {
+      const { url } = await uploadImage(file, undefined, kind === "logo" ? LOGO_BOX : BANNER_BOX);
+      if (kind === "logo") setLogoUrl(url);
+      else setBannerUrl(url);
+    } catch (err) {
+      setUploadError(err instanceof ApiError ? err.message : "That image could not be uploaded.");
+    } finally {
+      setUploading("");
+    }
+  }
+
+  function span(start: string, end: string): string {
+    if (!start && !end) return "Not set";
+    return `${start ? `${start.replace("T", " ")} UTC` : "any time"} to ${end ? `${end.replace("T", " ")} UTC` : "open-ended"}`;
+  }
 
   function iso(value: string): string | undefined {
-    if (!value) return undefined;
-    const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+    return fromUtcInput(value) ?? undefined;
   }
 
   async function submit(publish: boolean) {
+    const blocked = firstProblem(STEPS.length);
+    if (blocked) {
+      setStep(blocked.step);
+      setTried(true);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -235,11 +362,38 @@ export default function CreateEventPage() {
         minTeamSize: teamMin,
         maxTeamSize: teamMax,
         reviewsPerSubmission,
+        logoUrl: logoUrl || null,
+        bannerUrl: bannerUrl || null,
+        registrationFields: fieldRules,
+        registrationOpensAt: iso(registrationOpensAt),
         registrationClosesAt: iso(registrationClosesAt),
         submissionsOpenAt: iso(submissionsOpenAt),
         submissionDeadline: iso(submissionDeadline),
+        judgingOpensAt: iso(judgingOpensAt),
         judgingClosesAt: iso(judgingClosesAt),
       });
+
+      for (const [position, q] of formQuestions.entries()) {
+        await post(`/events/${event.slug}/questions`, {
+          stage: "REGISTRATION",
+          prompt: q.prompt.trim(),
+          type: q.type,
+          options: hasOptions(q.type) ? q.options.map((o) => o.trim()).filter(Boolean) : [],
+          helpText: q.helpText.trim() || null,
+          required: q.required,
+          publicAnswer: false,
+          position,
+        });
+      }
+
+      for (const round of customRounds) {
+        await post(`/events/${event.slug}/rounds`, {
+          name: round.name.trim(),
+          kind: round.kind,
+          opensAt: iso(round.opensAt) ?? null,
+          closesAt: iso(round.closesAt) ?? null,
+        });
+      }
 
       const createdTracks: Array<{ id: string; name: string }> = [];
       for (const track of tracks) {
@@ -345,7 +499,7 @@ export default function CreateEventPage() {
 
       <h1 className="display mt-3.5 max-w-[20ch] text-hero">Create an event</h1>
       <p className="mt-4 max-w-[58ch] text-body leading-[1.6] text-muted">
-        Six steps. Everything stays editable until you open registration.
+        Seven steps. Fields marked required must be filled before the event can be created.
       </p>
 
       <div className="mt-[clamp(26px,4vw,38px)] flex flex-wrap items-start gap-[clamp(24px,4vw,46px)]">
@@ -356,7 +510,11 @@ export default function CreateEventPage() {
               <button
                 key={s.label}
                 type="button"
-                onClick={() => setStep(i)}
+                onClick={() => {
+                  const blocked = i > step ? firstProblem(i) : null;
+                  setTried(Boolean(blocked));
+                  setStep(blocked ? blocked.step : i);
+                }}
                 className="flex items-center gap-[11px] rounded-lg border px-3 py-2.5 text-left [transition:background-color_200ms,border-color_200ms,color_200ms]"
                 style={{
                   background: on ? "var(--el)" : "transparent",
@@ -445,13 +603,13 @@ export default function CreateEventPage() {
                   </button>
                 ) : null}
               </div>
-              <Field label="Tagline" hint="Under 90 characters reads best in the listing." bordered>
+              <Field label="Tagline (required)" hint="Under 90 characters reads best in the listing." bordered>
                 <input className={FIELD} value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="One line on what participants will build" />
               </Field>
               <div className="border-b border-line py-4">
                 <MarkdownEditor
                   id="event-description"
-                  label="Description"
+                  label="Description (required)"
                   className={FIELD}
                   value={description}
                   onChange={setDescription}
@@ -469,10 +627,52 @@ export default function CreateEventPage() {
                 </div>
               </div>
               {mode !== "ONLINE" ? (
-                <Field label="Location" hint="Venue or city. Online events can leave this empty." bordered>
+                <Field label="Location (required)" hint="Venue or city, so people know where to go." bordered>
                   <input className={FIELD} value={place} onChange={(e) => setPlace(e.target.value)} placeholder="Rotterdam + online" />
                 </Field>
               ) : null}
+              <div className="grid gap-[7px] border-b border-line py-4">
+                <label className="text-ui font-medium">Logo and banner</label>
+                <p className="m-0 text-small leading-[1.5] text-muted">
+                  Optional. PNG, JPEG, GIF or WebP. A square logo shows on event cards; a wide banner (about 3:1, for
+                  example 1500 x 500) sits at the top of the event page.
+                </p>
+                <div className="mt-1 flex flex-wrap gap-3">
+                  {(
+                    [
+                      { kind: "logo", label: "Square logo", url: logoUrl, clear: () => setLogoUrl(""), box: "h-[112px] w-[112px]" },
+                      { kind: "banner", label: "Banner", url: bannerUrl, clear: () => setBannerUrl(""), box: "h-[112px] w-[336px] max-w-full" },
+                    ] as const
+                  ).map((img) => (
+                    <div key={img.kind} className="grid gap-1.5">
+                      <label
+                        className={`${img.box} grid cursor-pointer place-items-center overflow-hidden rounded-[10px] border border-dashed border-line-strong bg-elevated text-center text-small text-muted hover:border-muted`}
+                      >
+                        {img.url ? (
+                          <img src={mediaUrl(img.url)} alt={`${img.label} preview`} className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="px-2">{uploading === img.kind ? "Uploading..." : `+ ${img.label}`}</span>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/gif,image/webp"
+                          className="sr-only"
+                          onChange={(e) => {
+                            void upload(img.kind, e.target.files?.[0]);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                      {img.url ? (
+                        <button type="button" onClick={img.clear} className="justify-self-start border-0 bg-transparent p-0 text-small text-muted underline">
+                          Remove {img.label.toLowerCase()}
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+                {uploadError ? <p className="m-0 text-small text-danger">{uploadError}</p> : null}
+              </div>
               <div className="grid gap-[7px] border-b border-line py-4">
                 <label className="text-ui font-medium">Themes</label>
                 <div className="flex flex-wrap gap-[7px]">
@@ -506,27 +706,131 @@ export default function CreateEventPage() {
 
           {step === 1 ? (
             <div className="mt-3">
-              {[
-                { label: "Registration closes", value: registrationClosesAt, set: setRegistrationClosesAt, required: false },
-                { label: "Submissions open", value: submissionsOpenAt, set: setSubmissionsOpenAt, required: false },
-                { label: "Submission deadline", value: submissionDeadline, set: setSubmissionDeadline, required: true },
-                { label: "Judging closes", value: judgingClosesAt, set: setJudgingClosesAt, required: false },
-              ].map((f) => (
-                <div key={f.label} className="grid gap-[7px] border-b border-line py-4">
-                  <div className="flex items-baseline gap-2.5">
-                    <label className="text-ui font-medium">{f.label}</label>
-                    <span className="ml-auto font-mono text-label uppercase tracking-stamp text-muted">
-                      {f.required ? "required" : "optional"}
-                    </span>
+              <div className="grid gap-3">
+                {[
+                  {
+                    name: "Registration",
+                    hint: "People sign up and form teams.",
+                    start: { value: registrationOpensAt, set: setRegistrationOpensAt },
+                    end: { value: registrationClosesAt, set: setRegistrationClosesAt },
+                    endRequired: true,
+                  },
+                  {
+                    name: "Submissions",
+                    hint: "Teams hand in their projects. The end is the deadline.",
+                    start: { value: submissionsOpenAt, set: setSubmissionsOpenAt },
+                    end: { value: submissionDeadline, set: setSubmissionDeadline },
+                    endRequired: true,
+                  },
+                  {
+                    name: "Judging",
+                    hint: "Judges score the projects assigned to them.",
+                    start: { value: judgingOpensAt, set: setJudgingOpensAt },
+                    end: { value: judgingClosesAt, set: setJudgingClosesAt },
+                    endRequired: false,
+                  },
+                ].map((r, i) => (
+                  <div key={r.name} className="card p-[clamp(14px,2vw,18px)]">
+                    <div className="flex flex-wrap items-baseline gap-2.5">
+                      <span className="font-mono text-ui text-muted">{String(i + 1).padStart(2, "0")}</span>
+                      <h3 className="text-ui font-semibold">{r.name}</h3>
+                      <span className="ml-auto font-mono text-label uppercase tracking-stamp text-muted">
+                        default · enforced
+                      </span>
+                    </div>
+                    <p className="mt-1 text-small leading-[1.5] text-muted">{r.hint}</p>
+                    <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+                      <label className="grid gap-1.5 text-small text-muted">
+                        Starts, UTC (optional)
+                        <input
+                          type="datetime-local"
+                          className={`${FIELD} font-mono text-small`}
+                          value={r.start.value}
+                          onChange={(e) => r.start.set(e.target.value)}
+                        />
+                      </label>
+                      <label className="grid gap-1.5 text-small text-muted">
+                        Ends, UTC {r.endRequired ? "(required)" : "(optional)"}
+                        <input
+                          type="datetime-local"
+                          className={`${FIELD} font-mono text-small`}
+                          value={r.end.value}
+                          onChange={(e) => r.end.set(e.target.value)}
+                        />
+                      </label>
+                    </div>
                   </div>
-                  <input
-                    type="datetime-local"
-                    className={`${FIELD} font-mono text-small`}
-                    value={f.value}
-                    onChange={(e) => f.set(e.target.value)}
-                  />
-                </div>
-              ))}
+                ))}
+
+                {customRounds.map((r, i) => {
+                  const update = (change: Partial<CustomRound>) =>
+                    setCustomRounds((prev) => prev.map((x, j) => (j === i ? { ...x, ...change } : x)));
+                  return (
+                    <div key={i} className="card p-[clamp(14px,2vw,18px)]">
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <span className="font-mono text-ui text-muted">{String(i + 4).padStart(2, "0")}</span>
+                        <input
+                          className={`${FIELD} min-w-0 flex-[1_1_200px]`}
+                          placeholder="Round name, e.g. Final pitches"
+                          aria-label="Round name"
+                          value={r.name}
+                          onChange={(e) => update({ name: e.target.value })}
+                        />
+                        <select
+                          className={`${FIELD} flex-none`}
+                          aria-label="Round type"
+                          value={r.kind}
+                          onChange={(e) => update({ kind: e.target.value as RoundKind })}
+                        >
+                          {ROUND_KINDS.map((k) => (
+                            <option key={k.id} value={k.id}>
+                              {k.label}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          aria-label={`Delete ${r.name || "this round"}`}
+                          onClick={() => setCustomRounds((prev) => prev.filter((_, j) => j !== i))}
+                          className="h-[34px] w-[34px] flex-none rounded-md border border-line bg-surface text-body text-muted hover:border-danger hover:text-danger"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <p className="mt-1.5 text-small leading-[1.5] text-muted">
+                        Shown on the event&apos;s round ladder. Only the three default rounds are enforced by the server.
+                      </p>
+                      <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+                        <label className="grid gap-1.5 text-small text-muted">
+                          Starts, UTC (optional)
+                          <input
+                            type="datetime-local"
+                            className={`${FIELD} font-mono text-small`}
+                            value={r.opensAt}
+                            onChange={(e) => update({ opensAt: e.target.value })}
+                          />
+                        </label>
+                        <label className="grid gap-1.5 text-small text-muted">
+                          Ends, UTC (optional)
+                          <input
+                            type="datetime-local"
+                            className={`${FIELD} font-mono text-small`}
+                            value={r.closesAt}
+                            onChange={(e) => update({ closesAt: e.target.value })}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={() => setCustomRounds((prev) => [...prev, { name: "", kind: "PITCH", opensAt: "", closesAt: "" }])}
+                className="mt-3.5 rounded-[10px] border border-dashed border-line px-3.5 py-[9px] text-small hover:border-muted"
+              >
+                + Add a round
+              </button>
               <div className="grid gap-[7px] border-b border-line py-4">
                 <label className="text-ui font-medium">Team size</label>
                 <div className="flex flex-wrap items-center gap-2.5">
@@ -552,16 +856,6 @@ export default function CreateEventPage() {
                   <span className="text-small leading-[1.5] text-muted">people per submission</span>
                 </div>
               </div>
-              <Field label="Reviews per project" hint="How many independent ballots each project should collect. Assignment fills to this number." bordered>
-                <input
-                  type="number"
-                  min={1}
-                  max={20}
-                  className={`${FIELD} w-[82px] font-mono text-small`}
-                  value={reviewsPerSubmission}
-                  onChange={(e) => setReviewsPerSubmission(Number(e.target.value))}
-                />
-              </Field>
             </div>
           ) : null}
 
@@ -611,8 +905,8 @@ export default function CreateEventPage() {
                     }
                   />
                   <input
-                    aria-label="Prize amount"
-                    placeholder="0"
+                    aria-label="Prize amount in USD"
+                    placeholder="USD"
                     className={`${FIELD} flex-[0_1_130px] font-mono text-small`}
                     value={p.amount}
                     onChange={(e) =>
@@ -637,12 +931,193 @@ export default function CreateEventPage() {
                 + Add prize
               </button>
               <p className="mt-3 text-small leading-[1.5] text-muted">
-                Amounts are per prize, in the event currency. Leave blank for a non-cash prize.
+                Amounts are per prize, in US dollars (USD). Leave blank for a non-cash prize.
               </p>
             </div>
           ) : null}
 
           {step === 3 ? (
+            <div className="mt-3">
+              <div className="eyebrow mt-2">Standard fields</div>
+              <p className="mt-2 text-small leading-[1.5] text-muted">
+                Every registration asks for these unless you turn one off. The server checks the ones you make required.
+              </p>
+              <div className="mt-2 grid">
+                {[
+                  { label: "Full name", note: "Always asked." },
+                  { label: "Email", note: "Taken from the account." },
+                ].map((f) => (
+                  <div key={f.label} className="flex flex-wrap items-center gap-3 border-b border-line py-3">
+                    <div className="min-w-0 flex-[1_1_220px]">
+                      <div className="text-ui">{f.label}</div>
+                      <div className="text-small leading-[1.5] text-muted">{f.note}</div>
+                    </div>
+                    <span className="font-mono text-label uppercase tracking-stamp text-muted">required</span>
+                  </div>
+                ))}
+                {STANDARD_FIELDS.map((f) => (
+                  <div key={f.key} className="flex flex-wrap items-center gap-3 border-b border-line py-3">
+                    <div className="min-w-0 flex-[1_1_220px]">
+                      <div className="text-ui">{f.label}</div>
+                      <div className="text-small leading-[1.5] text-muted">{f.note}</div>
+                    </div>
+                    <div role="radiogroup" aria-label={f.label} className="flex flex-none gap-1.5">
+                      {(["required", "optional", "off"] as const).map((rule) => (
+                        <button
+                          key={rule}
+                          type="button"
+                          role="radio"
+                          aria-checked={fieldRules[f.key] === rule}
+                          onClick={() => setFieldRules((prev) => ({ ...prev, [f.key]: rule }))}
+                          className="pill btn-sm capitalize"
+                          style={chipStyle(fieldRules[f.key] === rule)}
+                        >
+                          {rule}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <div className="flex flex-wrap items-center gap-3 border-b border-line py-3">
+                  <div className="min-w-0 flex-[1_1_220px]">
+                    <div className="text-ui">Rules and code of conduct</div>
+                    <div className="text-small leading-[1.5] text-muted">Every participant accepts both.</div>
+                  </div>
+                  <span className="font-mono text-label uppercase tracking-stamp text-muted">required</span>
+                </div>
+              </div>
+
+              <div className="eyebrow mt-[clamp(26px,4vw,34px)]">Your questions</div>
+              <p className="mt-2 text-small leading-[1.5] text-muted">
+                Add anything else you need to know. Answers are visible to you and your admins only.
+              </p>
+              <div className="mt-3 grid gap-3">
+                {formQuestions.map((q, i) => {
+                  const update = (change: Partial<FormQuestion>) =>
+                    setFormQuestions((prev) => prev.map((x, j) => (j === i ? { ...x, ...change } : x)));
+                  const move = (to: number) =>
+                    setFormQuestions((prev) => {
+                      const next = [...prev];
+                      const [item] = next.splice(i, 1);
+                      next.splice(to, 0, item!);
+                      return next;
+                    });
+                  return (
+                    <div key={i} className="card p-[clamp(14px,2vw,18px)]">
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <span className="font-mono text-ui text-muted">Q{i + 1}</span>
+                        <input
+                          className={`${FIELD} min-w-0 flex-[1_1_240px]`}
+                          placeholder="Question, e.g. What do you want to build?"
+                          aria-label={`Question ${i + 1}`}
+                          value={q.prompt}
+                          onChange={(e) => update({ prompt: e.target.value })}
+                        />
+                        <select
+                          className={`${FIELD} flex-none`}
+                          aria-label="Answer type"
+                          value={q.type}
+                          onChange={(e) => {
+                            const type = e.target.value as QuestionType;
+                            update({ type, options: hasOptions(type) && q.options.length === 0 ? ["", ""] : q.options });
+                          }}
+                        >
+                          {QUESTION_TYPES.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <input
+                        className={`${FIELD} mt-2.5 w-full text-small`}
+                        placeholder="Help text (optional)"
+                        aria-label="Help text"
+                        value={q.helpText}
+                        onChange={(e) => update({ helpText: e.target.value })}
+                      />
+                      {hasOptions(q.type) ? (
+                        <div className="mt-2.5 grid gap-2">
+                          {q.options.map((o, k) => (
+                            <div key={k} className="flex items-center gap-2">
+                              <span aria-hidden="true" className="w-4 text-center text-muted">
+                                {q.type === "SELECT" ? "○" : "☐"}
+                              </span>
+                              <input
+                                className={`${FIELD} min-w-0 flex-1 text-small`}
+                                placeholder={`Option ${k + 1}`}
+                                aria-label={`Option ${k + 1}`}
+                                value={o}
+                                onChange={(e) => update({ options: q.options.map((x, m) => (m === k ? e.target.value : x)) })}
+                              />
+                              <button
+                                type="button"
+                                aria-label={`Remove option ${k + 1}`}
+                                onClick={() => update({ options: q.options.filter((_, m) => m !== k) })}
+                                className="h-[34px] w-[34px] flex-none rounded-md border border-line bg-surface text-body text-muted hover:border-danger hover:text-danger"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => update({ options: [...q.options, ""] })}
+                            className="justify-self-start border-0 bg-transparent p-0 text-small text-muted underline"
+                          >
+                            + Add option
+                          </button>
+                        </div>
+                      ) : null}
+                      <div className="mt-3 flex flex-wrap items-center gap-2.5 border-t border-line pt-3">
+                        <label className="flex cursor-pointer items-center gap-2 text-small">
+                          <input
+                            type="checkbox"
+                            checked={q.required}
+                            onChange={(e) => update({ required: e.target.checked })}
+                            className="h-[16px] w-[16px] accent-action"
+                          />
+                          Required
+                        </label>
+                        <span className="ml-auto flex gap-1.5">
+                          <button type="button" disabled={i === 0} onClick={() => move(i - 1)} className="btn btn-sm disabled:opacity-40" aria-label="Move up">
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            disabled={i === formQuestions.length - 1}
+                            onClick={() => move(i + 1)}
+                            className="btn btn-sm disabled:opacity-40"
+                            aria-label="Move down"
+                          >
+                            ↓
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormQuestions((prev) => prev.filter((_, j) => j !== i))}
+                            className="btn btn-sm hover:border-danger hover:text-danger"
+                          >
+                            Delete
+                          </button>
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setFormQuestions((prev) => [...prev, { prompt: "", type: "SHORT_TEXT", options: [], helpText: "", required: false }])
+                }
+                className="mt-3.5 rounded-[10px] border border-dashed border-line px-3.5 py-[9px] text-small hover:border-muted"
+              >
+                + Add a question
+              </button>
+            </div>
+          ) : null}
+
+          {step === 4 ? (
             <div className="mt-3">
               <div className="border-b border-line py-4">
                 <ScalePicker value={scale} onChange={setScale} />
@@ -710,8 +1185,18 @@ export default function CreateEventPage() {
             </div>
           ) : null}
 
-          {step === 4 ? (
+          {step === 5 ? (
             <div className="mt-3">
+              <Field label="Judges per project" hint="How many judges score each project. More judges means fairer results but more work for each judge; 2 to 3 is typical. Auto-balance fills to this number, and you can still assign more or fewer by hand." bordered>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  className={`${FIELD} w-[82px] font-mono text-small`}
+                  value={reviewsPerSubmission}
+                  onChange={(e) => setReviewsPerSubmission(Number(e.target.value))}
+                />
+              </Field>
               <div className="grid gap-[7px] border-b border-line py-4">
                 <label className="text-ui font-medium">Invite judges by email</label>
                 <div className="flex flex-wrap gap-2">
@@ -782,22 +1267,33 @@ export default function CreateEventPage() {
             </div>
           ) : null}
 
-          {step === 5 ? (
+          {step === 6 ? (
             <div className="card mt-[18px] overflow-hidden p-0">
               {[
                 { label: "Name", value: name || "Untitled" },
                 { label: "Link", value: `/events/${slug}` },
                 { label: "Tagline", value: tagline || "None" },
                 { label: "Themes", value: themeTags.join(", ") || "None" },
-                { label: "Registration closes", value: registrationClosesAt || "Not set" },
-                { label: "Submissions open", value: submissionsOpenAt || "Not set" },
-                { label: "Deadline", value: submissionDeadline || "Not set" },
-                { label: "Judging closes", value: judgingClosesAt || "Not set" },
+                { label: "Logo", value: logoUrl ? "Uploaded" : "None" },
+                { label: "Banner", value: bannerUrl ? "Uploaded" : "None" },
+                { label: "Registration", value: span(registrationOpensAt, registrationClosesAt) },
+                { label: "Submissions", value: span(submissionsOpenAt, submissionDeadline) },
+                { label: "Judging", value: span(judgingOpensAt, judgingClosesAt) },
+                ...customRounds.map((r, i) => ({
+                  label: `Round ${i + 4}`,
+                  value: `${r.name.trim() || "Unnamed"}: ${span(r.opensAt, r.closesAt)}`,
+                })),
                 { label: "Team size", value: `${teamMin} to ${teamMax}` },
-                { label: "Reviews per project", value: String(reviewsPerSubmission) },
+                { label: "Judges per project", value: String(reviewsPerSubmission) },
                 { label: "Tracks", value: tracks.join(", ") || "None" },
                 { label: "Prizes", value: prizes.filter((p) => p.title.trim()).map((p) => p.title).join(", ") || "None" },
                 { label: "Rubric", value: `${criteria.map((c) => `${c.label} ${c.weight}%`).join(", ")}, scored out of ${scale}` },
+                {
+                  label: "Registration form",
+                  value: `${STANDARD_FIELDS.filter((f) => fieldRules[f.key] === "required").length} required and ${
+                    STANDARD_FIELDS.filter((f) => fieldRules[f.key] === "optional").length
+                  } optional standard fields, ${formQuestions.length} question${formQuestions.length === 1 ? "" : "s"}`,
+                },
                 { label: "Judges", value: judges.join(", ") || "None yet" },
                 { label: "Eligibility", value: eligibility },
                 { label: "Visibility", value: visibility === "PUBLIC" ? "Public" : visibility === "UNLISTED" ? "Link only" : "Private" },
