@@ -1,3 +1,5 @@
+![podium banner](docs/asset.jpg)
+
 # podium
 
 A self-hostable, open-source hackathon submission and judging platform. Registration
