@@ -126,6 +126,11 @@ function DashboardCard({
               Winners
             </Link>
           ) : null}
+          {event.resultsPublished || event.status === "ARCHIVED" ? (
+            <Link href={`/events/${event.slug}/certificate`} className="btn btn-sm" aria-label={`Certificate, ${event.name}`}>
+              Certificate
+            </Link>
+          ) : null}
         </div>
       </div>
     </article>

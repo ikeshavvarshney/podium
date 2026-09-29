@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError, get } from "@/lib/api";
 import { hue } from "@/lib/hues";
 import type { EventDetail } from "@/lib/types";
-import { usd } from "@/lib/format";
+import { usd, utcDateTime } from "@/lib/format";
 
 interface Standing {
   rank: number;
@@ -227,7 +227,7 @@ export default function WinnersPage() {
               <p className="mt-5 max-w-[64ch] text-small leading-[1.65] text-muted">
                 {results.comparative
                   ? `Ranked by Borda count over ${results.ballotCount} group rankings`
-                  : `Ranked on the ${results.method === "ZSCORE" ? "per-judge z-score" : results.method === "RAW" ? "raw mean" : "rank-average"} of ${results.ballotCount} ballots`}, computed {new Date(results.computedAt).toLocaleString()}.{" "}
+                  : `Ranked on the ${results.method === "ZSCORE" ? "per-judge z-score" : results.method === "RAW" ? "raw mean" : "rank-average"} of ${results.ballotCount} ballots`}, computed {utcDateTime(results.computedAt)}.{" "}
                 <Link href={`/events/${slug}/results`} className="underline">
                   See the full working
                 </Link>

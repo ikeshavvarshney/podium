@@ -64,6 +64,11 @@ export function ParticipantPanel({ event }: { event: EventSummary }) {
       <Link href={step.action.href} className="btn-primary mt-3 w-full px-[18px] py-[11px] text-ui">
         {step.action.label}
       </Link>
+      {event.resultsPublished || event.status === "ARCHIVED" ? (
+        <Link href={`/events/${event.slug}/certificate`} className="btn mt-2 w-full px-[18px] py-[11px] text-ui">
+          Get your certificate
+        </Link>
+      ) : null}
     </section>
   );
 }
