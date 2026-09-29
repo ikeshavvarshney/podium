@@ -19,7 +19,8 @@ const prizeSchema = z.object({
   description: z.string().trim().max(2000).optional(),
   trackId: z.string().uuid().nullish(),
   amountCents: z.number().int().min(0).max(1_000_000_00).nullish(),
-  currency: z.string().trim().length(3).optional(),
+  // Every amount on the platform is in US dollars.
+  currency: z.literal("USD").optional(),
   quantity: z.number().int().min(1).max(100).optional(),
   position: z.number().int().min(0).max(999).optional(),
 });
@@ -65,7 +66,7 @@ router.post(
         description: req.body.description ?? null,
         trackId: req.body.trackId ?? null,
         amountCents: req.body.amountCents ?? null,
-        currency: req.body.currency ?? "USD",
+        currency: "USD",
         quantity: req.body.quantity ?? 1,
         position: req.body.position ?? 0,
       },

@@ -19,7 +19,8 @@ const challengeSchema = z.object({
   name: z.string().trim().min(1, "A challenge needs a name.").max(160),
   brief: z.string().trim().min(1, "A one-line brief is required.").max(400),
   amountCents: z.number().int().min(0).nullish(),
-  currency: z.string().trim().length(3).optional(),
+  // Every amount on the platform is in US dollars.
+  currency: z.literal("USD").optional(),
   tags: z.array(z.string().trim().min(1).max(30)).max(8).optional(),
   position: z.number().int().min(0).max(999).optional(),
 });
