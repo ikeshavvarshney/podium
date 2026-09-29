@@ -77,4 +77,4 @@ Bradley-Terry does better in 82% of events. It weighs a win by the strength of t
 - With few ballots per judge the mean and spread are noisy. Each judge's mean is shrunk toward the panel mean with a prior of 1 ballot and their variance toward the pooled within-judge variance with a prior of 3, so a judge with one or two ballots is read mostly on the panel's scale instead of being standardized against themselves. The table shows the gain over the unshrunk estimator.
 - It cannot rescue a judge who is noisy rather than biased, and it assumes judges are not colluding. See [SECURITY.md](SECURITY.md) for the threat model.
 
-The maths is in [JUDGING.md](../JUDGING.md). The assertions behind these numbers run in CI: `tests/unit/normalization-proof.test.ts`.
+The maths is in [JUDGING.md](../JUDGING.md). The assertions behind these numbers run with the test suite: `tests/unit/normalization-proof.test.ts`.

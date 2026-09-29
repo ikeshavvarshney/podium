@@ -122,7 +122,7 @@ that backs the claim.
 | --- | --- |
 | Sybil accounts | **Reduced** |
 | Ballot stuffing | **Stopped** for signed-in voting, **Reduced** otherwise |
-| Submission scraping | **Not addressed** (public by design) |
+| Submission scraping | **Reduced** (the gallery is public by design) |
 | Judge collusion | **Reduced** |
 | Deadline gaming | **Stopped** |
 
@@ -130,8 +130,8 @@ that backs the claim.
 
 *Attack:* create many accounts to inflate community votes or fill a team board.
 
-- **What exists.** `POST /auth/register`, `/auth/login` and `/auth/magic-link` share a limiter of
-  ceiling of 300 attempts per 15 minutes per hashed client address (`authRateLimit`), and failed
+- **What exists.** `POST /auth/register`, `/auth/login` and `/auth/magic-link` share a ceiling of
+  300 attempts per 15 minutes per hashed client address (`authRateLimit`), and failed
   sign-ins are limited per account and address. Accounts are
   event-scoped for anything that matters: a new account holds no judge or admin role anywhere,
   because roles come only from `event_memberships` rows an organizer grants.
@@ -140,7 +140,8 @@ that backs the claim.
   Signed-in voting therefore counts accounts, not people, and a quadratic budget is granted per
   account. The vote panel flags several voters behind one address for a human decision.
 - **Recommendation.** For a vote that decides a prize, use signed-in voting, read the flags, and
-  keep the credit budget small. Restricting voters to registered participants is not implemented.
+  keep the credit budget small. The organizer can also limit voting by role (visitors,
+  participants, judges, admins), for example to registered participants only.
 
 ### Ballot stuffing
 
@@ -223,8 +224,7 @@ read ballots, or promote themselves.
 
 ## Known limitations
 
-Stated plainly, per `CLAUDE.md`'s instruction to be honest about tier boundaries rather
-than claim coverage the code does not have.
+Stated plainly, rather than claiming coverage the code does not have.
 
 - **Rate limiting is per-process by default.** A horizontally scaled deployment sets
   `RATE_LIMIT_STORE=postgres` so replicas share windows through the database, with no Redis.

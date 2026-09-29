@@ -98,7 +98,7 @@ Sign in as `odalys@verdanto.io`.
 3. Open a project. Give each criterion a score from 1 to 5. The total should update. Save a draft, then submit.
 4. Skip one project, then come back to it.
 5. Open an event where this account is not a judge. The judge screen should be blocked.
-6. In an event that uses ranking instead of scores, put the projects in order and submit.
+6. Pairwise ranking: as organizer, in the **Settings** of an event with no ballots yet (for example one you created), set **Judging mode** to **Comparative ranking** with a group size of 2, make this account a judge and assign it projects. As the judge, pick the better of each pair and submit. The results screen ranks by Bradley-Terry, with Borda beside it.
 7. On an event whose winners are announced, open **Certificate** (also on **My events**). Download the PNG and the PDF: each holds only the certificate. A top-three or track-winning team's member sees a certificate of achievement naming the place or track. Download the signed record, open `/verify`, and paste it. It should say it is genuine. Change one letter and it should fail. Before results are published the page refuses.
 8. Check that you cannot see other judges' scores or the organizer pages.
 

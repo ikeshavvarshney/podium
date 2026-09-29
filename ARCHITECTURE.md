@@ -24,7 +24,7 @@ db.ts          one Prisma client for the process
 
 Route handlers stay thin. They validate input, resolve the permission context and call a
 service. Anything with a rule in it lives in a service, so it can be tested directly and
-reused by the eventual import, export and webhook paths.
+reused by the import, export and webhook paths.
 
 Errors are thrown, not returned. `AppError` carries an HTTP status and a stable code; a
 single error middleware renders the body, so no handler reinvents the error shape.
@@ -224,8 +224,8 @@ gets a small signed document rather than a certificate image.
   secret that is published in the repository. Production refuses to boot on the old dev default.
 - The payload is canonicalized (stable key order, no floating point) before signing, so
   the same facts always produce the same signature and a third party can recompute it.
-- `GET /records/verify` exposes the public key and re-runs the check, so a record is
-  verifiable without trusting the platform's own "verified" badge.
+- `GET /records/key` publishes the public key, and `POST /records/verify` re-runs the check,
+  so a record is verifiable without trusting the platform's own "verified" badge.
 
 ```mermaid
 sequenceDiagram
@@ -286,7 +286,7 @@ one page that stays anonymous on purpose. Client components handle session state
 and ask `GET /auth/session`, which answers a signed-out visitor with `user: null` instead
 of a 401.
 
-The design tokens come from the prototype: semantic CSS variables (`--bg`, `--sf`,
+The design tokens are semantic CSS variables (`--bg`, `--sf`,
 `--tx`, `--ac`, and so on) that flip between light and dark, mapped into Tailwind's
 colour scale so components never hard-code a hex value.
 
@@ -303,8 +303,9 @@ trade.
 **Slug or UUID in the URL.** `loadEventContext` accepts either, so public links read well
 and internal calls stay stable.
 
-**No file uploads.** Images are URLs. Adding object storage would have broken the
-offline-first requirement.
+**Uploads in Postgres, not object storage.** Images are stored as rows in `uploads`, so
+there is no object store to run offline and backups and event exports carry the images.
+That suits a hackathon's few hundred images; a much larger archive would want object storage.
 
 **One Postgres, no read replica, no cache.** The workload is a few hundred submissions
 and a few thousand ballots. Anything more would be infrastructure for a hypothetical.

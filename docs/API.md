@@ -4,7 +4,7 @@ REST over JSON. Base path `/api`. Every request body, query string and route par
 that carries meaning is validated with Zod before a handler runs; a bad shape is a `400`
 before any database query executes.
 
-The machine-readable reference is an **OpenAPI 3.1 document**: [openapi.json](openapi.json), also served live at `GET /api/openapi.json`. It is generated from the running routes and the same Zod validators the server enforces, so it cannot drift. Regenerate the committed copy with `npm run openapi` in `server/`. It lists every path, method, path and query parameter, request body schema, the role a route requires (`x-required-role`) and whether it needs a session.
+The machine-readable reference is an **OpenAPI 3.1 document**: [openapi.json](openapi.json), also served live at `GET /api/openapi.json`. It is generated from the running routes and the same Zod validators the server enforces, so it cannot drift. Regenerate the committed copy with `npm run openapi` in `src/server/`. It lists every path, method, path and query parameter, request body schema, the role a route requires (`x-required-role`) and whether it needs a session.
 
 This document is a map of what exists and how authorization is layered on top of it.
 
@@ -110,7 +110,7 @@ all of them); a missing area answers `403`.
 | GET | `/judge/queue`, `/judge/scores/:submissionId` | **Scoped to the caller.** A judge id in the query string is never trusted; the server derives whose queue this is from the session. |
 | PUT | `/judge/scores/:submissionId` | The weighted total is computed server-side from the stored rubric; a client-supplied total is ignored. |
 | GET / POST | `/judge/groups`, `/judge/rankings` | Comparative mode: fetch this judge's groups, submit an order for one. |
-| GET | `/rankings/standings` | Live Borda standings, organizer-only. |
+| GET | `/rankings/standings` | Live Borda standings: the whole panel for an organizer with the Judging area, a judge's own rankings for a judge. |
 | GET | `/judge/record` | The judge's own signed participation record. |
 | GET | `/scores` | Organizer-only aggregate view. There is no `judgeId` parameter to trust or ignore: a non-organizer caller gets `403` regardless of what the query string says. |
 | GET / POST | `/results/preview`, `/results/normalize`, `/results/runs`, `/results/publish`, `/results` | Normalization is a POST that creates an immutable `normalization_runs` row carrying a digest of the ballots it read; reading a result is always from a stored run, never a live recomputation. `runs` marks each run `current` (ballots unchanged since) and `published`. `publish` takes `{ publish, runId? }`, pins that run (the newest by default), refuses with `409` a run the ballots no longer match, and freezes ballots until unpublished. Comparative events rank by Bradley-Terry, with Borda as the raw column. |
@@ -151,7 +151,7 @@ accept = timingSafeEqual(expected, headers["x-podium-signature"]) && fresh && !a
 
 ## A cross-event authorization failure, end to end
 
-The scenario `CLAUDE.md` calls out explicitly: judge A tries judge B's endpoint.
+The scenario the acceptance checker probes: judge A tries to reach judge B's work.
 
 ```mermaid
 sequenceDiagram

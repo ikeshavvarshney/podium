@@ -202,10 +202,10 @@ is another review, not a cleverer formula.
 A submission with zero ballots is listed as unranked rather than assigned a bottom score.
 
 **On the fixture data.** The imported `fixtures.json` event exercises all of this: projects
-carry two to five ballots, and three judges are degenerate for z-scoring (one judge scored
-three projects 4/4/4, two others cast a single ballot). Their spread is zero, so they are
-flagged `degenerate` in the judge statistics and their ballots contribute without being
-divided by zero. All 40 imported projects are ranked. The duplicate submission is refused at
+carry two to five ballots. One judge scored three projects identically, so they are flagged
+`degenerate` and their ballots contribute 0. Two others cast a single ballot: one ballot is not
+a flat judge, just an unknown one, so shrinkage reads them on the panel's scale instead. All 40
+imported projects are ranked. The duplicate submission is refused at
 import, so its ballots never reach the ranking; see `DATA-MODEL.md`.
 
 ## 6. Isolation
