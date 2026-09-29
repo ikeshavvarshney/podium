@@ -327,4 +327,50 @@ describe("community voting", () => {
       await as(organizer).put(`/api/events/${capped.id}/voting/config`).send({ maxChoices: 2 }).expect(409);
     });
   });
+
+  describe("final votes", () => {
+    let final: { id: string };
+    let a: string;
+    let b: string;
+
+    beforeAll(async () => {
+      final = await createEvent(organizer, { name: "Final Votes", submissionDeadline: FUTURE });
+      a = await submitProject(await createUser({ name: "Final A" }), final.id, "Final Team A", "Final Project A");
+      b = await submitProject(await createUser({ name: "Final B" }), final.id, "Final Team B", "Final Project B");
+    });
+
+    it("defaults a new poll to one vote per voter that can change until the poll closes", async () => {
+      const res = await as(organizer).get(`/api/events/${final.id}/voting/config`).expect(200);
+      expect(res.body.maxChoices).toBe(1);
+      expect(res.body.allowVoteChange).toBe(true);
+    });
+
+    it("refuses a second ballot once the organizer makes votes final, and audits the attempt", async () => {
+      await as(organizer)
+        .put(`/api/events/${final.id}/voting/config`)
+        .send({ enabled: true, access: "AUTHENTICATED", allowVoteChange: false })
+        .expect(200);
+      const ballot = await as(voter).get(`/api/events/${final.id}/voting/ballot`).expect(200);
+      expect(ballot.body.allowVoteChange).toBe(false);
+
+      await as(voter).post(`/api/events/${final.id}/votes`).send({ entries: [{ submissionId: a, weight: 1 }] }).expect(201);
+      const again = await as(voter)
+        .post(`/api/events/${final.id}/votes`)
+        .send({ entries: [{ submissionId: b, weight: 1 }] })
+        .expect(409);
+      expect(again.body.error.message).toContain("final");
+
+      const stored = await prisma.vote.findMany({ where: { eventId: final.id }, select: { submissionId: true } });
+      expect(stored).toEqual([{ submissionId: a }]);
+      const rejected = await prisma.auditLog.findMany({
+        where: { eventId: final.id, action: "VOTE_REJECTED", summary: { contains: "final" } },
+      });
+      expect(rejected).toHaveLength(1);
+    });
+
+    it("locks whether votes can change once a ballot exists", async () => {
+      await as(organizer).put(`/api/events/${final.id}/voting/config`).send({ enabled: false }).expect(200);
+      await as(organizer).put(`/api/events/${final.id}/voting/config`).send({ allowVoteChange: true }).expect(409);
+    });
+  });
 });

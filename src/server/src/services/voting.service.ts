@@ -33,7 +33,8 @@ const DEFAULT_CONFIG = {
   allowJudges: false,
   allowAdmins: false,
   maxVotesPerIpPerHour: 60,
-  maxChoices: null as number | null,
+  maxChoices: 1 as number | null,
+  allowVoteChange: true,
 };
 
 export async function getVotingConfig(eventId: string) {
@@ -49,7 +50,10 @@ export async function votingMethodLock(ctx: EventContext): Promise<{ locked: boo
   const config = await getVotingConfig(ctx.event.id);
   const ballots = await prisma.vote.count({ where: { eventId: ctx.event.id } });
   if (ballots > 0) {
-    return { locked: true, reason: "Ballots have already been cast, so the method, credit budget and choice limit can no longer change." };
+    return {
+      locked: true,
+      reason: "Ballots have already been cast, so the method, credit budget, vote limit and whether votes can change can no longer change.",
+    };
   }
   if (config.enabled && votingWindow(ctx.event, config).open) {
     return { locked: true, reason: "The poll is live. Close it before changing the method or credit budget." };
@@ -72,7 +76,8 @@ export async function upsertVotingConfig(
   const changesMethod = input.method !== undefined && input.method !== current.method;
   const changesBudget = input.creditBudget !== undefined && input.creditBudget !== current.creditBudget;
   const changesChoices = input.maxChoices !== undefined && input.maxChoices !== current.maxChoices;
-  if (changesMethod || changesBudget || changesChoices) {
+  const changesFinality = input.allowVoteChange !== undefined && input.allowVoteChange !== current.allowVoteChange;
+  if (changesMethod || changesBudget || changesChoices || changesFinality) {
     const lock = await votingMethodLock(ctx);
     if (lock.locked) throw conflict(lock.reason ?? "The voting method is locked.");
   }
@@ -255,6 +260,7 @@ export async function getBallot(ctx: EventContext, claims: VoterClaims = {}, ipH
     access: config.access,
     creditBudget: config.creditBudget,
     maxChoices: config.maxChoices,
+    allowVoteChange: config.allowVoteChange,
     creditsSpent: existing.reduce((sum, v) => sum + v.credits, 0),
     /** Email-gated and not yet verified: the ballot page asks for the address and a code first. */
     needsVerification: config.access === VotingAccess.EMAIL_GATED && !ctx.user && !claims.verifiedEmail,
@@ -272,9 +278,9 @@ export interface CastBallotInput {
 }
 
 /**
- * Replaces this voter's whole ballot in one transaction. Duplicate detection is
- * the database's unique (event, submission, voter) constraint rather than an
- * application-level check.
+ * Replaces this voter's whole ballot in one transaction, or refuses a second ballot when the
+ * organizer made votes final. Duplicate detection is the database's unique (event, submission,
+ * voter) constraint rather than an application-level check.
  */
 export async function castBallot(
   ctx: EventContext,
@@ -299,6 +305,21 @@ export async function castBallot(
   }
 
   const voter = resolveVoter(ctx, config, claims, ipHash);
+
+  if (!config.allowVoteChange) {
+    const already = await prisma.vote.count({ where: { eventId: ctx.event.id, voterKey: voter.voterKey } });
+    if (already > 0) {
+      recordAuditSafe({
+        action: AuditAction.VOTE_REJECTED,
+        eventId: ctx.event.id,
+        actorId: ctx.user?.id ?? null,
+        targetType: "vote",
+        summary: "Ballot rejected: votes in this poll are final",
+        ipHash,
+      });
+      throw conflict("You have already voted. Votes in this poll are final.");
+    }
+  }
 
   if (!ctx.user && config.access === VotingAccess.OPEN_LINK && ipHash) {
     const others = await prisma.vote.findMany({

@@ -35,6 +35,8 @@ describe("voting method defaults and locking", () => {
   it("defaults to one vote per person", async () => {
     const res = await as(organizer).get(`/api/events/${event.id}/voting/config`).expect(200);
     expect(res.body.method).toBe("SINGLE");
+    expect(res.body.maxChoices).toBe(1);
+    expect(res.body.allowVoteChange).toBe(true);
     expect(res.body.methodLocked).toBe(false);
   });
 

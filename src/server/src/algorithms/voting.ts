@@ -70,8 +70,8 @@ export function priceBallot(
   if (method === "SINGLE" && maxChoices !== null && backed > maxChoices) {
     throw new BallotError(
       maxChoices === 1
-        ? "This event allows one vote per person: back a single project."
-        : `This event lets each voter back at most ${maxChoices} projects.`,
+        ? "This poll allows one vote per person: vote for a single project."
+        : `This poll lets each voter vote for at most ${maxChoices} projects.`,
     );
   }
 

@@ -24,6 +24,8 @@ interface BallotView {
   access: "OPEN_LINK" | "EMAIL_GATED" | "AUTHENTICATED";
   creditBudget: number;
   maxChoices: number | null;
+  /** False when the organizer made votes final: a voter's first ballot cannot be changed. */
+  allowVoteChange: boolean;
   creditsSpent: number;
   needsVerification: boolean;
   verifiedEmail: string | null;
@@ -83,6 +85,9 @@ export default function VotePage() {
   const needsEmail = !user && !needsAccount && ballot.needsVerification;
   const backed = Object.values(weights).filter((w) => w > 0).length;
   const overChoices = ballot.method === "SINGLE" && ballot.maxChoices !== null && backed > ballot.maxChoices;
+  // One vote per person reads as a normal poll: picking a project moves the vote there.
+  const onePick = ballot.method === "SINGLE" && ballot.maxChoices === 1;
+  const finalCast = !ballot.allowVoteChange && ballot.myVotes.length > 0;
 
   async function sendCode() {
     setError("");
@@ -107,7 +112,7 @@ export default function VotePage() {
   }
 
   function setWeight(id: string, next: number) {
-    setWeights((prev) => ({ ...prev, [id]: Math.max(0, next) }));
+    setWeights((prev) => (onePick && next > 0 ? { [id]: 1 } : { ...prev, [id]: Math.max(0, next) }));
   }
 
   async function submit() {
@@ -123,7 +128,9 @@ export default function VotePage() {
       setNotice(
         ballot!.method === "QUADRATIC"
           ? `Ballot recorded. ${res.creditsSpent} credits spent, ${res.creditsRemaining} left.`
-          : "Ballot recorded.",
+          : ballot!.allowVoteChange
+            ? "Vote recorded. You can change it until voting closes."
+            : "Vote recorded. Votes in this poll are final.",
       );
       await load();
     } catch (err) {
@@ -139,16 +146,16 @@ export default function VotePage() {
       <div className="mt-3 flex flex-wrap items-end justify-between gap-y-[18px] gap-x-6">
         <div className="min-w-0 flex-[1_1_320px]">
           <h1 className="display text-page">
-            {ballot.method === "QUADRATIC" ? "Spend your credits." : "Back your favourites."}
+            {ballot.method === "QUADRATIC" ? "Spend your credits." : "Cast your vote."}
           </h1>
           <p className="mt-3 max-w-[60ch] text-body leading-[1.6] text-muted">
             {ballot.method === "QUADRATIC"
               ? `You hold ${budget} credits. Backing a project with weight w costs w squared credits, so concentrating on one favourite is deliberately expensive. This is not one person, one vote.`
               : ballot.maxChoices === 1
-                ? "One vote per person: back the single project you think should win."
+                ? "One person, one vote. Pick the project you think should win."
                 : ballot.maxChoices
-                  ? `Back up to ${ballot.maxChoices} projects. The tally is a headcount.`
-                  : "One vote per project. The tally is a headcount."}{" "}
+                  ? `Vote for up to ${ballot.maxChoices} projects, one vote each.`
+                  : "Vote for as many projects as you like, one vote each."}{" "}
             {ballot.hideResults ? "Standings stay hidden until voting closes." : ""}
           </p>
         </div>
@@ -287,11 +294,13 @@ export default function VotePage() {
                   ) : (
                     <button
                       type="button"
+                      aria-pressed={weight > 0}
+                      disabled={finalCast}
                       onClick={() => setWeight(s.id, weight ? 0 : 1)}
-                      className="btn btn-sm"
+                      className="btn btn-sm disabled:opacity-60"
                       style={weight ? { background: "var(--acs)", color: "var(--act)", borderColor: "transparent" } : undefined}
                     >
-                      {weight ? "Backed" : "Back this"}
+                      {weight ? "Your vote" : "Vote"}
                     </button>
                   )}
                 </div>
@@ -305,17 +314,21 @@ export default function VotePage() {
         <button
           type="button"
           onClick={() => void submit()}
-          disabled={busy || over || overChoices || !ballot.window.open || needsAccount || Boolean(ineligible) || needsEmail}
+          disabled={busy || over || overChoices || finalCast || !ballot.window.open || needsAccount || Boolean(ineligible) || needsEmail}
           className="btn-primary disabled:opacity-40"
         >
-          {busy ? "Submitting..." : "Submit ballot"}
+          {busy ? "Submitting..." : ballot.method === "QUADRATIC" ? "Submit ballot" : onePick ? "Submit vote" : "Submit votes"}
         </button>
         <span className="text-small leading-[1.5] text-muted">
           {over
             ? `That ballot costs ${spent} credits, which is over your budget of ${budget}.`
             : overChoices
-              ? `You can back at most ${ballot.maxChoices} project${ballot.maxChoices === 1 ? "" : "s"}.`
-              : "Submitting replaces your previous ballot in full."}
+              ? `You can vote for at most ${ballot.maxChoices} project${ballot.maxChoices === 1 ? "" : "s"}.`
+              : finalCast
+                ? "Your vote is in. Votes in this poll are final."
+                : ballot.allowVoteChange
+                  ? "You can change your vote until voting closes."
+                  : "Your vote is final once you submit it."}
         </span>
       </div>
     </main>

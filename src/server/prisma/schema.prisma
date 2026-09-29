@@ -904,8 +904,11 @@ model VotingConfig {
 
   /// Open-link voting: distinct voters one address may add per hour.
   maxVotesPerIpPerHour Int @default(60) @map("max_votes_per_ip_per_hour")
-  /// SINGLE only: how many projects one voter may back. Null means any number (approval voting).
-  maxChoices Int? @map("max_choices")
+  /// SINGLE only: how many projects one voter may back. One (the default) is a normal poll, one person
+  /// one vote; null means any number (approval voting).
+  maxChoices Int? @default(1) @map("max_choices")
+  /// Whether a voter may change their vote until the poll closes. Off makes the first ballot final.
+  allowVoteChange Boolean @default(true) @map("allow_vote_change")
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 

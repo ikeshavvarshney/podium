@@ -36,6 +36,7 @@ const configSchema = z.object({
   allowAdmins: z.boolean().optional(),
   maxVotesPerIpPerHour: z.number().int().min(1).max(10000).optional(),
   maxChoices: z.number().int().min(1).max(200).nullable().optional(),
+  allowVoteChange: z.boolean().optional(),
 });
 
 const ballotSchema = z.object({

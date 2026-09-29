@@ -24,6 +24,7 @@ interface VotingConfig {
   allowAdmins: boolean;
   maxVotesPerIpPerHour: number;
   maxChoices: number | null;
+  allowVoteChange: boolean;
   methodLocked?: boolean;
   lockReason?: string | null;
 }
@@ -143,7 +144,7 @@ export default function VotingManagerPage() {
 
   const voterGroups: Array<{ key: VoterGroup; label: string; hint: string }> = [
     { key: "allowVisitors", label: "Visitors", hint: "Anyone with no role in this event, signed in or not." },
-    { key: "allowParticipants", label: "Participants", hint: "Registered entrants. They can never back their own team." },
+    { key: "allowParticipants", label: "Participants", hint: "Registered entrants. They can never vote for their own team." },
     { key: "allowJudges", label: "Judges", hint: "Off by default: they already score on the rubric." },
     { key: "allowAdmins", label: "Admins and organizers", hint: "Off by default, for the same reason." },
   ];
@@ -221,7 +222,7 @@ export default function VotingManagerPage() {
                   className="pill disabled:cursor-not-allowed disabled:opacity-60"
                   style={on ? { background: h.bg, color: h.fg, borderColor: "transparent" } : undefined}
                 >
-                  {m === "QUADRATIC" ? "Quadratic" : "Headcount"}
+                  {m === "QUADRATIC" ? "Quadratic" : "Standard"}
                 </button>
               );
             })}
@@ -229,12 +230,12 @@ export default function VotingManagerPage() {
           <p className="mt-2 max-w-[62ch] text-small leading-[1.55] text-muted">
             {(choosingQuadratic ? "QUADRATIC" : config.method) === "QUADRATIC"
               ? "Each voter holds a credit budget that you set, and buys weight on a project at weight squared credits. Backing one project with weight 3 costs 9; spreading 1 across three projects costs 3."
-              : "Each voter may back a project once, for one unit of weight. The tally is a headcount. This is the default."}
+              : "Each vote counts once. With one vote per voter, the default, this is a normal poll: one person, one vote."}
           </p>
           {config.method === "SINGLE" && !choosingQuadratic ? (
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <label htmlFor="max-choices" className="text-ui font-medium">
-                Projects each voter may back
+                Votes per voter
               </label>
               <select
                 id="max-choices"
@@ -243,16 +244,43 @@ export default function VotingManagerPage() {
                 onChange={(e) => void save({ maxChoices: e.target.value ? Number(e.target.value) : null })}
                 className="rounded-[10px] border border-line bg-surface px-3 py-2 font-mono text-small outline-none focus:border-muted disabled:opacity-60"
               >
-                <option value="">Any number</option>
-                <option value="1">One (one vote per person)</option>
+                <option value="1">One (one person, one vote)</option>
                 {[2, 3, 5].map((n) => (
                   <option key={n} value={n}>
                     Up to {n}
                   </option>
                 ))}
+                <option value="">Any number (approval voting)</option>
               </select>
             </div>
           ) : null}
+          <div className="mt-4 text-ui font-medium">Changing a vote</div>
+          <div className="mt-2.5 flex flex-wrap gap-[7px]" role="group" aria-label="Changing a vote">
+            {([true, false] as const).map((allow) => {
+              const on = config.allowVoteChange === allow;
+              const h = hue("brand");
+              return (
+                <button
+                  key={String(allow)}
+                  type="button"
+                  aria-pressed={on}
+                  disabled={config.methodLocked}
+                  onClick={() => {
+                    if (!on) void save({ allowVoteChange: allow });
+                  }}
+                  className="pill disabled:cursor-not-allowed disabled:opacity-60"
+                  style={on ? { background: h.bg, color: h.fg, borderColor: "transparent" } : undefined}
+                >
+                  {allow ? "Allowed until voting closes" : "Final once cast"}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2 max-w-[62ch] text-small leading-[1.55] text-muted">
+            {config.allowVoteChange
+              ? "A voter can submit again before the poll closes; the new vote replaces the old one."
+              : "A voter's first vote is final. The server refuses a second ballot and records the attempt."}
+          </p>
           {config.methodLocked ? (
             <p role="status" className="mt-2 max-w-[62ch] text-small leading-[1.55] text-muted">
               Locked: {config.lockReason}
@@ -492,7 +520,7 @@ export default function VotingManagerPage() {
               {[
                 {
                   title: "Duplicate detection",
-                  body: "One ballot line per voter per project, enforced by a unique database constraint rather than application code. Re-voting replaces the previous ballot.",
+                  body: `One ballot line per voter per project, enforced by a unique database constraint rather than application code. ${config.allowVoteChange ? "Voting again replaces the previous ballot." : "Votes are final: a second ballot is refused."}`,
                 },
                 {
                   title: "Rate limiting",
@@ -504,7 +532,7 @@ export default function VotingManagerPage() {
                 },
                 {
                   title: "Self-voting",
-                  body: "A signed-in voter cannot back their own team's project, checked against team membership on the server.",
+                  body: "A signed-in voter cannot vote for their own team's project, checked against team membership on the server.",
                 },
               ].map((c) => (
                 <div key={c.title} className="rounded-[10px] border border-line px-4 py-3.5">

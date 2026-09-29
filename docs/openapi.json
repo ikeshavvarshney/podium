@@ -7971,6 +7971,9 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "allowVoteChange": {
+                    "type": "boolean"
                   }
                 }
               }
