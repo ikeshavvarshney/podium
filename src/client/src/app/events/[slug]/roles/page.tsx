@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError, del, get, patch, post } from "@/lib/api";
 import { hue, initials, ROLE_HUE } from "@/lib/hues";
 import type { EventDetail, EventRole } from "@/lib/types";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Notice } from "@/components/ui/notice";
 import { PageStatus } from "@/components/ui/page-status";
 import { PageHeader } from "@/components/ui/page-header";
@@ -48,6 +49,8 @@ export default function ManageRolesPage() {
   const [role, setRole] = useState<EventRole>("JUDGE");
   const [busy, setBusy] = useState(false);
   const [scopeFor, setScopeFor] = useState<Membership | null>(null);
+  const [revoking, setRevoking] = useState<Membership | null>(null);
+  const [revokeBusy, setRevokeBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -89,11 +92,15 @@ export default function ManageRolesPage() {
 
   async function revoke(membership: Membership) {
     setGrantError("");
+    setRevokeBusy(true);
     try {
       await del(`/events/${slug}/members/${membership.id}`);
       await load();
     } catch (err) {
       setGrantError(err instanceof ApiError ? err.message : "That role could not be revoked.");
+    } finally {
+      setRevokeBusy(false);
+      setRevoking(null);
     }
   }
 
@@ -240,7 +247,7 @@ export default function ManageRolesPage() {
                       {r === "PARTICIPANT" ? null : (
                         <button
                           type="button"
-                          onClick={() => void revoke(m)}
+                          onClick={() => setRevoking(m)}
                           className="btn btn-sm flex-none hover:border-danger hover:text-danger"
                         >
                           Revoke
@@ -328,6 +335,23 @@ export default function ManageRolesPage() {
           </div>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={revoking !== null}
+        title={revoking ? `Revoke ${revoking.user.name} as ${revoking.role === "ADMIN" ? "admin" : "judge"}?` : ""}
+        confirmLabel="Revoke"
+        tone="danger"
+        busy={revokeBusy}
+        onConfirm={() => revoking && void revoke(revoking)}
+        onCancel={() => setRevoking(null)}
+      >
+        {revoking ? (
+          <p className="m-0">
+            {revoking.user.name} ({revoking.user.email}) loses {revoking.role === "ADMIN" ? "admin" : "judge"} access to{" "}
+            {event.name} right away. You can grant it again later.
+          </p>
+        ) : null}
+      </ConfirmDialog>
     </main>
   );
 }
