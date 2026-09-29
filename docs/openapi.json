@@ -1568,6 +1568,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2038,6 +2041,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2053,9 +2059,6 @@
                   "description": {
                     "type": "string",
                     "maxLength": 2000
-                  },
-                  "restricted": {
-                    "type": "boolean"
                   },
                   "position": {
                     "type": "integer",
@@ -2127,6 +2130,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2142,9 +2148,6 @@
                   "description": {
                     "type": "string",
                     "maxLength": 2000
-                  },
-                  "restricted": {
-                    "type": "boolean"
                   },
                   "position": {
                     "type": "integer",
@@ -2210,7 +2213,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ]
       }
     },
     "/api/events/{eventId}/prizes": {
@@ -2295,6 +2301,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2412,6 +2421,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2523,7 +2535,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ]
       }
     },
     "/api/events/{eventId}/members": {
@@ -2584,7 +2599,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "ROLES"
+        ]
       },
       "post": {
         "operationId": "post_api_events_eventId_members",
@@ -2632,6 +2650,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "ROLES"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2650,13 +2671,25 @@
                       "ADMIN"
                     ]
                   },
-                  "trackScope": {
+                  "permissions": {
                     "type": "array",
                     "items": {
                       "type": "string",
-                      "format": "uuid"
+                      "enum": [
+                        "ALL",
+                        "SETTINGS",
+                        "ROUNDS",
+                        "ROLES",
+                        "JUDGING",
+                        "RESULTS",
+                        "VOTING",
+                        "SUBMISSIONS",
+                        "UPDATES",
+                        "INTEGRATIONS",
+                        "AUDIT"
+                      ]
                     },
-                    "maxItems": 50
+                    "maxItems": 11
                   }
                 },
                 "required": [
@@ -2724,6 +2757,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "ROLES"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2731,17 +2767,29 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "trackScope": {
+                  "permissions": {
                     "type": "array",
                     "items": {
                       "type": "string",
-                      "format": "uuid"
+                      "enum": [
+                        "ALL",
+                        "SETTINGS",
+                        "ROUNDS",
+                        "ROLES",
+                        "JUDGING",
+                        "RESULTS",
+                        "VOTING",
+                        "SUBMISSIONS",
+                        "UPDATES",
+                        "INTEGRATIONS",
+                        "AUDIT"
+                      ]
                     },
-                    "maxItems": 50
+                    "maxItems": 11
                   }
                 },
                 "required": [
-                  "trackScope"
+                  "permissions"
                 ]
               }
             }
@@ -2801,7 +2849,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "ROLES"
+        ]
       }
     },
     "/api/events/{eventId}/questions": {
@@ -2886,6 +2937,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -3010,6 +3064,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -3128,7 +3185,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ]
       }
     },
     "/api/events/{eventId}/teams": {
@@ -3942,6 +4002,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "SUBMISSIONS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -4930,7 +4993,150 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "SUBMISSIONS"
+        ]
+      }
+    },
+    "/api/events/{eventId}/submissions/{submissionId}/flag": {
+      "post": {
+        "operationId": "post_api_events_eventId_submissions_submissionId_flag",
+        "tags": [
+          "submissions"
+        ],
+        "summary": "POST /api/events/{eventId}/submissions/{submissionId}/flag",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "submissionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success. The body is JSON unless the route exports a file."
+          },
+          "400": {
+            "description": "Validation failed. `error.details` maps field names to messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in."
+          },
+          "403": {
+            "description": "Signed in but not permitted."
+          },
+          "404": {
+            "description": "Not found, or hidden from this caller."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "SUBMISSIONS"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{eventId}/submissions/{submissionId}/restore": {
+      "post": {
+        "operationId": "post_api_events_eventId_submissions_submissionId_restore",
+        "tags": [
+          "submissions"
+        ],
+        "summary": "POST /api/events/{eventId}/submissions/{submissionId}/restore",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "submissionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success. The body is JSON unless the route exports a file."
+          },
+          "400": {
+            "description": "Validation failed. `error.details` maps field names to messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in."
+          },
+          "403": {
+            "description": "Signed in but not permitted."
+          },
+          "404": {
+            "description": "Not found, or hidden from this caller."
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "SUBMISSIONS"
+        ]
       }
     },
     "/api/events/{eventId}/submissions/{submissionId}/lock": {
@@ -4988,6 +5194,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "SUBMISSIONS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -5135,6 +5344,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "UPDATES"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -5334,6 +5546,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "UPDATES"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -5422,7 +5637,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "UPDATES"
+        ]
       }
     },
     "/api/events/{eventId}/audit": {
@@ -5490,7 +5708,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "AUDIT"
+        ]
       }
     },
     "/api/events/{eventId}/audit/verify": {
@@ -5539,7 +5760,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "AUDIT"
+        ]
       }
     },
     "/api/events/{eventId}/board": {
@@ -5942,6 +6166,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "ROUNDS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -6079,6 +6306,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "ROUNDS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -6210,7 +6440,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "ROUNDS"
+        ]
       }
     },
     "/api/events/{eventId}/faq": {
@@ -6295,6 +6528,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -6383,6 +6619,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -6464,7 +6703,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ]
       }
     },
     "/api/events/{eventId}/people": {
@@ -6549,6 +6791,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -6654,6 +6899,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -6752,7 +7000,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ]
       }
     },
     "/api/events/{eventId}/partners": {
@@ -6837,6 +7088,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -6925,6 +7179,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -7006,7 +7263,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ]
       }
     },
     "/api/events/{eventId}/challenges": {
@@ -7091,6 +7351,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -7208,6 +7471,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -7317,7 +7583,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "SETTINGS"
+        ]
       }
     },
     "/api/events/{eventId}/import/roster": {
@@ -7367,6 +7636,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "ROLES"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -7490,7 +7762,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "RESULTS"
+        ]
       }
     },
     "/api/events/{eventId}/webhooks": {
@@ -7539,7 +7814,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "INTEGRATIONS"
+        ]
       },
       "post": {
         "operationId": "post_api_events_eventId_webhooks",
@@ -7587,6 +7865,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "INTEGRATIONS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -7645,6 +7926,8 @@
                         "SUBMISSION_SUBMITTED",
                         "SUBMISSION_WITHDRAWN",
                         "SUBMISSION_LOCKED",
+                        "SUBMISSION_FLAGGED",
+                        "SUBMISSION_RESTORED",
                         "SUBMISSION_EDIT_REJECTED",
                         "RUBRIC_UPDATED",
                         "JUDGE_INVITED",
@@ -7666,7 +7949,7 @@
                       ]
                     },
                     "minItems": 1,
-                    "maxItems": 60
+                    "maxItems": 62
                   }
                 },
                 "required": [
@@ -7734,6 +8017,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "INTEGRATIONS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -7792,6 +8078,8 @@
                         "SUBMISSION_SUBMITTED",
                         "SUBMISSION_WITHDRAWN",
                         "SUBMISSION_LOCKED",
+                        "SUBMISSION_FLAGGED",
+                        "SUBMISSION_RESTORED",
                         "SUBMISSION_EDIT_REJECTED",
                         "RUBRIC_UPDATED",
                         "JUDGE_INVITED",
@@ -7813,7 +8101,7 @@
                       ]
                     },
                     "minItems": 1,
-                    "maxItems": 60
+                    "maxItems": 62
                   },
                   "active": {
                     "type": "boolean"
@@ -7877,7 +8165,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "INTEGRATIONS"
+        ]
       }
     },
     "/api/events/{eventId}/webhooks/{webhookId}/deliveries/{deliveryId}/retry": {
@@ -7942,7 +8233,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "INTEGRATIONS"
+        ]
       }
     },
     "/api/events/{eventId}/voting/config": {
@@ -7991,7 +8285,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "VOTING"
+        ]
       },
       "put": {
         "operationId": "put_api_events_eventId_voting_config",
@@ -8039,6 +8336,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "VOTING"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -8387,7 +8687,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "VOTING"
+        ]
       }
     },
     "/api/events/{eventId}/votes/results": {
@@ -8473,7 +8776,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "INTEGRATIONS"
+        ]
       }
     },
     "/api/events/{eventId}/export/teams.csv": {
@@ -8522,7 +8828,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "INTEGRATIONS"
+        ]
       }
     },
     "/api/events/{eventId}/export/judges.csv": {
@@ -8571,7 +8880,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "INTEGRATIONS"
+        ]
       }
     },
     "/api/events/{eventId}/export/scores.csv": {
@@ -8620,7 +8932,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "INTEGRATIONS"
+        ]
       }
     },
     "/api/events/{eventId}/export/results.csv": {
@@ -8678,7 +8993,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "INTEGRATIONS"
+        ]
       }
     },
     "/api/events/{eventId}/export/audit.csv": {
@@ -8727,7 +9045,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "INTEGRATIONS"
+        ]
       }
     },
     "/api/events/{eventId}/export/event.json": {
@@ -8776,7 +9097,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "INTEGRATIONS"
+        ]
       }
     },
     "/api/events/{eventId}/rubric": {
@@ -8861,6 +9185,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "JUDGING"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -8990,7 +9317,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "JUDGING"
+        ]
       },
       "post": {
         "operationId": "post_api_events_eventId_assignments",
@@ -9038,6 +9368,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "JUDGING"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -9108,7 +9441,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "JUDGING"
+        ]
       }
     },
     "/api/events/{eventId}/assignments/generate": {
@@ -9158,6 +9494,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "JUDGING"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -9237,7 +9576,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "JUDGING"
+        ]
       }
     },
     "/api/events/{eventId}/judging/integrity": {
@@ -9286,7 +9628,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "JUDGING"
+        ]
       }
     },
     "/api/events/{eventId}/progress": {
@@ -9335,7 +9680,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "JUDGING"
+        ]
       }
     },
     "/api/events/{eventId}/judge/queue": {
@@ -10010,7 +10358,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "RESULTS"
+        ]
       }
     },
     "/api/events/{eventId}/results/normalize": {
@@ -10060,6 +10411,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "RESULTS"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -10127,7 +10481,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "RESULTS"
+        ]
       }
     },
     "/api/events/{eventId}/results/runs/{runId}": {
@@ -10184,7 +10541,10 @@
             "cookieAuth": []
           }
         ],
-        "x-required-role": "event admin"
+        "x-required-role": "event admin",
+        "x-required-area": [
+          "RESULTS"
+        ]
       }
     },
     "/api/events/{eventId}/results/publish": {
@@ -10234,6 +10594,9 @@
           }
         ],
         "x-required-role": "event admin",
+        "x-required-area": [
+          "RESULTS"
+        ],
         "requestBody": {
           "required": true,
           "content": {

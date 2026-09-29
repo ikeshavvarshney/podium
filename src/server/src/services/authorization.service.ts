@@ -3,6 +3,7 @@ import { EventRole } from "@prisma/client";
 import { prisma } from "../db.js";
 import { forbidden, notFound } from "../lib/errors.js";
 import type { AuthUser } from "../middleware/auth.js";
+import { EVENT_AREAS, FULL_ACCESS, isEventArea, type EventArea } from "../lib/permissions.js";
 
 /**
  * Everything a request is allowed to do inside one event, derived from the
@@ -15,10 +16,11 @@ export interface EventContext {
   roles: Set<EventRole>;
   isOwner: boolean;
   isEventAdmin: boolean;
+  /** Organizer areas this caller may use; every area for an owner, a super admin or a full-access admin. */
+  permissions: Set<EventArea>;
+  fullAccess: boolean;
   isJudge: boolean;
   isParticipant: boolean;
-  /** Empty array means the judge is not track-restricted. */
-  judgeTrackScope: string[];
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -48,7 +50,9 @@ export async function buildEventContext(
   const isSuperAdmin = !!user?.isSuperAdmin;
   const isEventAdmin = isOwner || isSuperAdmin || roles.has(EventRole.ADMIN);
 
-  const judgeMembership = memberships.find((m) => m.role === EventRole.JUDGE);
+  const granted = memberships.find((m) => m.role === EventRole.ADMIN)?.permissions ?? [];
+  const fullAccess = isOwner || isSuperAdmin || granted.includes(FULL_ACCESS);
+  const permissions = new Set<EventArea>(fullAccess ? EVENT_AREAS : granted.filter(isEventArea));
 
   return {
     event,
@@ -57,9 +61,10 @@ export async function buildEventContext(
     roles,
     isOwner,
     isEventAdmin,
+    permissions,
+    fullAccess,
     isJudge: roles.has(EventRole.JUDGE),
     isParticipant: roles.has(EventRole.PARTICIPANT),
-    judgeTrackScope: judgeMembership?.trackScope ?? [],
   };
 }
 
@@ -75,6 +80,21 @@ export function assertEventVisible(ctx: EventContext): void {
 
 export function assertEventAdmin(ctx: EventContext): void {
   if (!ctx.isEventAdmin) throw forbidden("Organizer or event admin access is required.");
+}
+
+export function can(ctx: EventContext, area: EventArea): boolean {
+  return ctx.permissions.has(area);
+}
+
+export function assertPermission(ctx: EventContext, areas: EventArea[]): void {
+  if (!ctx.isEventAdmin) throw forbidden("Organizer or event admin access is required.");
+  if (!areas.some((a) => ctx.permissions.has(a))) {
+    throw forbidden("Your admin access to this event does not include this.");
+  }
+}
+
+export function assertFullAccess(ctx: EventContext): void {
+  if (!ctx.fullAccess) throw forbidden("Only an organizer with full access can manage admins.");
 }
 
 export function assertJudge(ctx: EventContext): void {

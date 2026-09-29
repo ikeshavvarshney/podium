@@ -3,21 +3,18 @@
  * behaviour can be tested without a database.
  *
  * Goal: give every submission `reviewsPerSubmission` independent evaluations
- * while keeping judge workloads even, respecting track restrictions, and never
- * asking anyone to review their own team's work.
+ * while keeping judge workloads even and never asking anyone to review their
+ * own team's work.
  */
 
 export interface AssignableSubmission {
   id: string;
-  trackId: string | null;
   /** Users on the owning team, who must never be assigned this submission. */
   memberIds: string[];
 }
 
 export interface AssignableJudge {
   id: string;
-  /** Empty means the judge may review every track. */
-  trackScope: string[];
   /** Assignments the judge already holds, which count toward their load. */
   existingSubmissionIds: string[];
 }
@@ -58,12 +55,7 @@ function shuffle<T>(items: T[], rand: () => number): T[] {
 
 export function canJudgeReview(judge: AssignableJudge, submission: AssignableSubmission): boolean {
   // Self-review: a judge is never given their own team's submission.
-  if (submission.memberIds.includes(judge.id)) return false;
-
-  // Track restriction: an empty scope means unrestricted.
-  if (judge.trackScope.length === 0) return true;
-  if (!submission.trackId) return false;
-  return judge.trackScope.includes(submission.trackId);
+  return !submission.memberIds.includes(judge.id);
 }
 
 /**

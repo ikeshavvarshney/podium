@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { asyncHandler } from "../lib/async-handler.js";
 import { requireAuth } from "../middleware/auth.js";
-import { eventContext, loadEventContext, requireEventAdmin } from "../middleware/event-context.js";
+import { eventContext, loadEventContext, requirePermission } from "../middleware/event-context.js";
 import { validate } from "../middleware/validate.js";
 import { verifyAuditChain } from "../services/audit.service.js";
 
@@ -17,7 +17,7 @@ router.get(
   "/",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("AUDIT"),
   validate({
     query: z.object({
       take: z.coerce.number().int().min(1).max(200).optional(),
@@ -57,7 +57,7 @@ router.get(
   "/verify",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("AUDIT"),
   asyncHandler(async (req, res) => {
     res.json(await verifyAuditChain(eventContext(req).event.id));
   }),

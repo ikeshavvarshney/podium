@@ -48,6 +48,8 @@ export async function exportSubmissions(ctx: EventContext): Promise<string> {
       "video_url",
       "tech_tags",
       "license",
+      "flag_reason",
+      "flagged_at",
     ],
     submissions.map((s) => [
       s.id,
@@ -63,6 +65,8 @@ export async function exportSubmissions(ctx: EventContext): Promise<string> {
       s.videoUrl,
       s.techTags.join("; "),
       s.license,
+      s.flagReason,
+      s.flaggedAt?.toISOString() ?? "",
     ]),
   );
 }
@@ -73,7 +77,7 @@ export async function exportJudges(ctx: EventContext): Promise<string> {
     include: { user: { select: { id: true, name: true, email: true, org: true } } },
   });
 
-  const [assignments, scores, tracks] = await Promise.all([
+  const [assignments, scores] = await Promise.all([
     prisma.judgeAssignment.groupBy({
       by: ["judgeId"],
       where: { eventId: ctx.event.id },
@@ -85,15 +89,13 @@ export async function exportJudges(ctx: EventContext): Promise<string> {
       _count: { _all: true },
       _avg: { weightedTotal: true },
     }),
-    prisma.track.findMany({ where: { eventId: ctx.event.id }, select: { id: true, name: true } }),
   ]);
 
-  const trackName = new Map(tracks.map((t) => [t.id, t.name]));
   const assignedBy = new Map(assignments.map((a) => [a.judgeId, a._count._all]));
   const scoredBy = new Map(scores.map((s) => [s.judgeId, s]));
 
   return toCsv(
-    ["judge_id", "name", "email", "org", "track_scope", "assigned", "completed", "mean_score"],
+    ["judge_id", "name", "email", "org", "assigned", "completed", "mean_score"],
     judges.map((j) => {
       const stat = scoredBy.get(j.userId);
       return [
@@ -101,7 +103,6 @@ export async function exportJudges(ctx: EventContext): Promise<string> {
         j.user.name,
         j.user.email,
         j.user.org ?? "",
-        j.trackScope.map((id) => trackName.get(id) ?? id).join("; ") || "all tracks",
         assignedBy.get(j.userId) ?? 0,
         stat?._count._all ?? 0,
         stat?._avg.weightedTotal?.toFixed(2) ?? "",

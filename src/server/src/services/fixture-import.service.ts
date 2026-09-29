@@ -282,7 +282,6 @@ export async function importFixture(
       eventId: event.id,
       userId: judgeUser.get(j.id)!,
       role: EventRole.JUDGE,
-      trackScope: j.tracks.map((t) => trackId.get(t)).filter((t): t is string => !!t),
       invitedById: opts.ownerId,
       acceptedAt: close,
     })),

@@ -1,4 +1,4 @@
-import { JudgingMode } from "@prisma/client";
+import { JudgingMode, SubmissionStatus } from "@prisma/client";
 import { bordaCount, buildGroups, groupKey } from "../algorithms/pairwise.js";
 import { prisma } from "../db.js";
 import { badRequest, conflict, forbidden } from "../lib/errors.js";
@@ -26,14 +26,14 @@ async function assertComparativeMode(eventId: string) {
 
 /**
  * The judge's own groups. Built from their own assignments, so comparative
- * mode inherits the assignment engine's isolation and track scoping rather
+ * mode inherits the assignment engine's isolation rather
  * than inventing a second set of rules.
  */
 export async function getMyGroups(ctx: EventContext, judgeId: string) {
   const rubric = await assertComparativeMode(ctx.event.id);
 
   const assignments = await prisma.judgeAssignment.findMany({
-    where: { eventId: ctx.event.id, judgeId },
+    where: { eventId: ctx.event.id, judgeId, submission: { status: { not: SubmissionStatus.DISQUALIFIED } } },
     select: { submissionId: true },
     orderBy: { position: "asc" },
   });

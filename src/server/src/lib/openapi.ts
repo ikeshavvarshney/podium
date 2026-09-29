@@ -120,6 +120,7 @@ interface Operation {
   schemas: Schemas;
   auth: boolean;
   role: string | null;
+  areas: string[] | null;
 }
 
 /** Turns an Express mount regexp back into a path such as "/events/:eventId/tracks". */
@@ -138,6 +139,7 @@ function mountPath(layer: Layer): string {
 
 const ROLE_BY_MIDDLEWARE: Record<string, string> = {
   requireEventAdmin: "event admin",
+  requirePermission: "event admin",
   requireJudge: "judge in this event",
   requireOrganizerCapability: "organizer account",
 };
@@ -147,6 +149,7 @@ function collect(stack: Layer[], prefix: string, out: Operation[]): void {
     if (layer.route) {
       const schemas: Schemas = {};
       let role: string | null = null;
+      let areasNeeded: string[] | null = null;
       let auth = false;
       for (const h of layer.route.stack) {
         if (h.handle.schemas) Object.assign(schemas, h.handle.schemas);
@@ -156,10 +159,12 @@ function collect(stack: Layer[], prefix: string, out: Operation[]): void {
           role = mapped;
           auth = true;
         }
+        const areas = (h.handle as { areas?: string[] }).areas;
+        if (areas) areasNeeded = areas;
       }
       const routePath = layer.route.path === "/" ? "" : layer.route.path;
       for (const method of Object.keys(layer.route.methods)) {
-        out.push({ method, path: `${prefix}${routePath}`, schemas, auth, role });
+        out.push({ method, path: `${prefix}${routePath}`, schemas, auth, role, areas: areasNeeded });
       }
     } else if (layer.handle.stack) {
       collect(layer.handle.stack, `${prefix}${mountPath(layer)}`, out);
@@ -214,6 +219,7 @@ export function buildOpenApi(app: Express): Json {
     };
     if (op.auth) operation.security = [{ cookieAuth: [] }];
     if (op.role) operation["x-required-role"] = op.role;
+    if (op.areas) operation["x-required-area"] = op.areas;
     if (op.schemas.body) {
       operation.requestBody = { required: true, content: { "application/json": { schema: zodToSchema(op.schemas.body) } } };
     }

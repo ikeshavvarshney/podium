@@ -3,7 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../lib/async-handler.js";
 import { requireAuth } from "../middleware/auth.js";
-import { eventContext, loadEventContext, requireEventAdmin } from "../middleware/event-context.js";
+import { eventContext, loadEventContext, requirePermission } from "../middleware/event-context.js";
 import { writeRateLimit } from "../middleware/rate-limit.js";
 import { validate } from "../middleware/validate.js";
 import { AuditAction, recordAudit } from "../services/audit.service.js";
@@ -28,7 +28,7 @@ router.post(
   "/import/roster",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("ROLES"),
   writeRateLimit,
   validate({
     body: z.object({
@@ -58,7 +58,7 @@ router.get(
   "/certificates/summary",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("RESULTS"),
   asyncHandler(async (req, res) => {
     res.json(await certificateSummary(eventContext(req)));
   }),
@@ -74,7 +74,7 @@ router.get(
   "/webhooks",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("INTEGRATIONS"),
   asyncHandler(async (req, res) => {
     res.json({ available: WEBHOOK_EVENTS, hooks: await listWebhooks(eventContext(req)) });
   }),
@@ -84,7 +84,7 @@ router.post(
   "/webhooks",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("INTEGRATIONS"),
   writeRateLimit,
   validate({ body: z.object({ url: z.string().trim().max(500), events: eventsSchema }) }),
   asyncHandler(async (req, res) => {
@@ -107,7 +107,7 @@ router.patch(
   "/webhooks/:webhookId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("INTEGRATIONS"),
   validate({
     body: z.object({
       url: z.string().trim().max(500).optional(),
@@ -135,7 +135,7 @@ router.delete(
   "/webhooks/:webhookId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("INTEGRATIONS"),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
     await deleteWebhook(ctx, req.params.webhookId as string);
@@ -156,7 +156,7 @@ router.post(
   "/webhooks/:webhookId/deliveries/:deliveryId/retry",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("INTEGRATIONS"),
   writeRateLimit,
   validate({ params: z.object({ webhookId: z.string().uuid(), deliveryId: z.string().uuid() }).passthrough() }),
   asyncHandler(async (req, res) => {

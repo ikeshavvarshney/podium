@@ -4,7 +4,7 @@ import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { config } from "../config.js";
 import { asyncHandler } from "../lib/async-handler.js";
-import { eventContext, loadEventContext, requireEventAdmin } from "../middleware/event-context.js";
+import { eventContext, loadEventContext, requirePermission } from "../middleware/event-context.js";
 import { requireAuth } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rate-limit.js";
 import { validate } from "../middleware/validate.js";
@@ -92,7 +92,7 @@ router.get(
   "/voting/config",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("VOTING"),
   asyncHandler(async (req, res) => {
     res.json(await getVotingConfigForAdmin(eventContext(req)));
   }),
@@ -102,7 +102,7 @@ router.put(
   "/voting/config",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("VOTING"),
   validate({ body: configSchema }),
   asyncHandler(async (req, res) => {
     res.json(await upsertVotingConfig(eventContext(req), req.body, req.ipHash));
@@ -165,7 +165,7 @@ router.get(
   "/votes/ballots",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("VOTING"),
   asyncHandler(async (req, res) => {
     res.json(await listBallots(eventContext(req)));
   }),

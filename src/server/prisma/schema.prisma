@@ -293,9 +293,8 @@ model EventMembership {
   userId  String    @map("user_id") @db.Uuid
   role    EventRole
 
-  /// A judge restricted to these track ids sees nothing outside them. Empty
-  /// means "every track in this event".
-  trackScope String[] @default([]) @map("track_scope")
+  /// For an admin: the organizer areas it may use, or ["ALL"] for everything.
+  permissions String[] @default([])
 
   invitedById String?   @map("invited_by_id") @db.Uuid
   acceptedAt  DateTime? @map("accepted_at")
@@ -418,8 +417,6 @@ model Track {
   name        String
   slug        String
   description String?
-  /// Restricted tracks require an explicit judge track scope to be readable.
-  restricted  Boolean @default(false)
   position    Int     @default(0)
 
   event       Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -610,6 +607,10 @@ model Submission {
   /// Set when an organizer locks the entry. Combined with the event deadline
   /// this is what the server checks before allowing an edit.
   lockedAt    DateTime?        @map("locked_at")
+  /// Set with status DISQUALIFIED when an organizer removes the entry from public view.
+  flagReason  String?          @map("flag_reason")
+  flaggedAt   DateTime?        @map("flagged_at")
+  flaggedById String?          @map("flagged_by_id") @db.Uuid
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

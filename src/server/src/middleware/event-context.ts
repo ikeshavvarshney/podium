@@ -1,7 +1,9 @@
 import type { NextFunction, Request, Response } from "express";
 import { badRequest, forbidden } from "../lib/errors.js";
+import type { EventArea } from "../lib/permissions.js";
 import {
   assertEventAdmin,
+  assertPermission,
   assertEventVisible,
   assertJudge,
   buildEventContext,
@@ -45,6 +47,15 @@ export function eventContext(req: Request): EventContext {
 export function requireEventAdmin(req: Request, _res: Response, next: NextFunction): void {
   assertEventAdmin(eventContext(req));
   next();
+}
+
+/** Admin access limited to one or more organizer areas; any of them is enough. */
+export function requirePermission(...areas: EventArea[]) {
+  const requirePermission = (req: Request, _res: Response, next: NextFunction): void => {
+    assertPermission(eventContext(req), areas);
+    next();
+  };
+  return Object.assign(requirePermission, { areas });
 }
 
 export function requireJudge(req: Request, _res: Response, next: NextFunction): void {

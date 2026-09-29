@@ -290,7 +290,12 @@ describe("integrations", () => {
   });
 
   describe("certificates", () => {
+    it("holds certificates back until the winners are announced", async () => {
+      await as(participant).get(`/api/events/${event.id}/certificates/me`).expect(403);
+    });
+
     it("issues a signed certificate to someone who took part", async () => {
+      await prisma.event.update({ where: { id: event.id }, data: { resultsPublished: true } });
       const res = await as(participant).get(`/api/events/${event.id}/certificates/me`).expect(200);
       expect(res.body.payload.holder.id).toBe(participant.id);
       expect(res.body.payload.roles).toContain("PARTICIPANT");

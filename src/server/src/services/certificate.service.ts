@@ -1,9 +1,10 @@
-import { EventRole, SubmissionStatus } from "@prisma/client";
+import { EventRole, EventStatus, SubmissionStatus } from "@prisma/client";
 import { createHash } from "node:crypto";
 import { prisma } from "../db.js";
 import { forbidden } from "../lib/errors.js";
 import { canonicalize, signPayload, signingPublicKey } from "../lib/signing.js";
 import type { EventContext } from "./authorization.service.js";
+import { getPublishedResults } from "./results.service.js";
 
 export interface CertificatePayload {
   type: "podium.participation-certificate.v1";
@@ -15,6 +16,8 @@ export interface CertificatePayload {
   submission: string | null;
   /** For judges: how many projects they evaluated. Counts only, never the scores. */
   judging?: { assigned: number; scored: number };
+  /** A top-three overall place, a track win, or both, from the published results. */
+  award?: { place: number | null; track: string | null };
 }
 
 /**
@@ -27,6 +30,10 @@ export async function buildMyCertificate(ctx: EventContext) {
   if (ctx.roles.size === 0 && !ctx.isOwner) {
     throw forbidden("Certificates are issued to people who took part in this event.");
   }
+  const finished = ctx.event.resultsPublished || ctx.event.status === EventStatus.ARCHIVED;
+  if (!finished && !ctx.isEventAdmin) {
+    throw forbidden("Certificates are issued once the winners are announced.");
+  }
 
   const [holder, team, judgingCounts] = await Promise.all([
     prisma.user.findUniqueOrThrow({
@@ -37,7 +44,7 @@ export async function buildMyCertificate(ctx: EventContext) {
       where: { eventId: ctx.event.id, members: { some: { userId: ctx.user.id } } },
       select: {
         name: true,
-        submission: { select: { name: true, status: true } },
+        submission: { select: { id: true, name: true, status: true } },
       },
     }),
     ctx.roles.has(EventRole.JUDGE)
@@ -47,6 +54,9 @@ export async function buildMyCertificate(ctx: EventContext) {
         ]).then(([assigned, scored]) => ({ assigned, scored }))
       : Promise.resolve(null),
   ]);
+
+  const submitted = team?.submission?.status === SubmissionStatus.SUBMITTED ? team.submission : null;
+  const award = submitted && (ctx.event.resultsPublished || ctx.permissions.has("RESULTS")) ? await awardFor(ctx, submitted.id) : null;
 
   const payload: CertificatePayload = {
     type: "podium.participation-certificate.v1",
@@ -60,6 +70,7 @@ export async function buildMyCertificate(ctx: EventContext) {
         ? team.submission.name
         : null,
     ...(judgingCounts ? { judging: judgingCounts } : {}),
+    ...(award ? { award } : {}),
   };
 
   return {
@@ -68,6 +79,19 @@ export async function buildMyCertificate(ctx: EventContext) {
     hash: createHash("sha256").update(canonicalize(payload)).digest("hex"),
     key: signingPublicKey(),
   };
+}
+
+/** The same rule as the winners page: top three overall, and the best-ranked entry in each track. */
+async function awardFor(ctx: EventContext, submissionId: string) {
+  const results = await getPublishedResults(ctx).catch(() => null);
+  if (!results) return null;
+  const mine = results.standings.find((s) => s.submission.id === submissionId);
+  if (!mine) return null;
+  const place = mine.rank <= 3 ? mine.rank : null;
+  const trackName = mine.submission.track?.name ?? null;
+  const trackWinner = trackName ? results.standings.find((s) => s.submission.track?.name === trackName) : undefined;
+  const track = trackWinner?.submission.id === submissionId ? trackName : null;
+  return place || track ? { place, track } : null;
 }
 
 /** Organizer view: how many certificates the event can issue, by role. */

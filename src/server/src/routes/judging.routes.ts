@@ -8,7 +8,7 @@ import { currentUser, requireAuth } from "../middleware/auth.js";
 import {
   eventContext,
   loadEventContext,
-  requireEventAdmin,
+  requirePermission,
   requireJudge,
 } from "../middleware/event-context.js";
 import { writeRateLimit } from "../middleware/rate-limit.js";
@@ -81,7 +81,7 @@ router.put(
   "/rubric",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("JUDGING"),
   writeRateLimit,
   validate({ body: rubricSchema }),
   asyncHandler(async (req, res) => {
@@ -97,7 +97,7 @@ router.get(
   "/assignments",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("JUDGING"),
   asyncHandler(async (req, res) => {
     res.json(
       await prisma.judgeAssignment.findMany({
@@ -116,7 +116,7 @@ router.post(
   "/assignments/generate",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("JUDGING"),
   writeRateLimit,
   validate({
     body: z.object({
@@ -134,7 +134,7 @@ router.post(
   "/assignments",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("JUDGING"),
   writeRateLimit,
   validate({
     body: z.object({ judgeId: z.string().uuid(), submissionId: z.string().uuid() }),
@@ -154,7 +154,7 @@ router.delete(
   "/assignments",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("JUDGING"),
   asyncHandler(async (req, res) => {
     res.json(await clearUnscoredAssignments(eventContext(req), req.ipHash));
   }),
@@ -164,7 +164,7 @@ router.delete(
   "/assignments/:assignmentId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("JUDGING"),
   asyncHandler(async (req, res) => {
     await unassignJudge(eventContext(req), req.params.assignmentId as string, req.ipHash);
     res.status(204).end();
@@ -176,7 +176,7 @@ router.get(
   "/judging/integrity",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("JUDGING"),
   asyncHandler(async (req, res) => {
     res.json(await getPanelIntegrity(eventContext(req)));
   }),
@@ -186,7 +186,7 @@ router.get(
   "/progress",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("JUDGING"),
   asyncHandler(async (req, res) => {
     res.json(await getJudgingProgress(eventContext(req)));
   }),
@@ -322,7 +322,7 @@ router.get(
   asyncHandler(loadEventContext),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
-    if (ctx.isEventAdmin) {
+    if (ctx.permissions.has("JUDGING")) {
       res.json(await getBordaStandings(ctx));
       return;
     }
@@ -361,7 +361,7 @@ router.get(
   asyncHandler(loadEventContext),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
-    if (!ctx.isEventAdmin) {
+    if (!ctx.permissions.has("JUDGING") && !ctx.permissions.has("RESULTS")) {
       throw forbidden("Only organizers can read the full score set for an event.");
     }
     res.json(
@@ -390,7 +390,7 @@ router.get(
   "/results/preview",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("RESULTS"),
   validate({ query: methodQuery }),
   asyncHandler(async (req, res) => {
     const method = (req.query.method as NormalizationMethod) ?? NormalizationMethod.ZSCORE;
@@ -402,7 +402,7 @@ router.post(
   "/results/normalize",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("RESULTS"),
   writeRateLimit,
   validate({ body: methodQuery }),
   asyncHandler(async (req, res) => {
@@ -416,7 +416,7 @@ router.get(
   "/results/runs",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("RESULTS"),
   asyncHandler(async (req, res) => {
     res.json(await listRuns(eventContext(req)));
   }),
@@ -426,7 +426,7 @@ router.get(
   "/results/runs/:runId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("RESULTS"),
   asyncHandler(async (req, res) => {
     res.json(await getRun(eventContext(req), req.params.runId as string));
   }),
@@ -436,7 +436,7 @@ router.post(
   "/results/publish",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("RESULTS"),
   validate({ body: z.object({ publish: z.boolean(), runId: z.string().uuid().optional() }) }),
   asyncHandler(async (req, res) => {
     res.json(await publishResults(eventContext(req), req.body.publish, req.ipHash, req.body.runId));

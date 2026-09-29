@@ -4,7 +4,7 @@ import { prisma } from "../db.js";
 import { asyncHandler } from "../lib/async-handler.js";
 import { forbidden, notFound } from "../lib/errors.js";
 import { currentUser, requireAuth } from "../middleware/auth.js";
-import { eventContext, loadEventContext, requireEventAdmin } from "../middleware/event-context.js";
+import { eventContext, loadEventContext, requirePermission } from "../middleware/event-context.js";
 import { writeRateLimit } from "../middleware/rate-limit.js";
 import { validate } from "../middleware/validate.js";
 import { AuditAction, recordAudit } from "../services/audit.service.js";
@@ -38,14 +38,14 @@ router.get(
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
     const submission = await loadSubmission(ctx.event.id, req.params.submissionId as string);
-    if (submission.status !== "SUBMITTED" && !ctx.isEventAdmin) {
+    if (submission.status !== "SUBMITTED" && !ctx.permissions.has("SUBMISSIONS")) {
       throw notFound("That submission does not exist in this event.");
     }
 
     const comments = await prisma.comment.findMany({
       where: {
         submissionId: submission.id,
-        ...(ctx.isEventAdmin ? {} : { hiddenAt: null }),
+        ...(ctx.permissions.has("SUBMISSIONS") ? {} : { hiddenAt: null }),
       },
       include: authorSelect,
       orderBy: { createdAt: "asc" },
@@ -64,7 +64,7 @@ router.post(
     const ctx = eventContext(req);
     const user = currentUser(req);
     const submission = await loadSubmission(ctx.event.id, req.params.submissionId as string);
-    if (submission.status !== "SUBMITTED" && !ctx.isEventAdmin) {
+    if (submission.status !== "SUBMITTED" && !ctx.permissions.has("SUBMISSIONS")) {
       throw notFound("That submission does not exist in this event.");
     }
 
@@ -97,7 +97,7 @@ router.post(
   "/:commentId/hide",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SUBMISSIONS"),
   validate({ body: z.object({ reason: z.string().trim().max(300).optional() }) }),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
@@ -138,7 +138,7 @@ router.delete(
       where: { id: req.params.commentId as string, eventId: ctx.event.id },
     });
     if (!existing) throw notFound("That comment does not exist in this event.");
-    if (existing.userId !== user.id && !ctx.isEventAdmin) {
+    if (existing.userId !== user.id && !ctx.permissions.has("SUBMISSIONS")) {
       throw forbidden("You can only remove your own comments.");
     }
 

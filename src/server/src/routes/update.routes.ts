@@ -5,7 +5,7 @@ import { prisma } from "../db.js";
 import { asyncHandler } from "../lib/async-handler.js";
 import { notFound } from "../lib/errors.js";
 import { currentUser, requireAuth } from "../middleware/auth.js";
-import { eventContext, loadEventContext, requireEventAdmin } from "../middleware/event-context.js";
+import { eventContext, loadEventContext, requirePermission } from "../middleware/event-context.js";
 import { writeRateLimit } from "../middleware/rate-limit.js";
 import { validate } from "../middleware/validate.js";
 import { AuditAction, recordAudit } from "../services/audit.service.js";
@@ -53,7 +53,7 @@ router.post(
   "/",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("UPDATES"),
   writeRateLimit,
   validate({ body: updateSchema }),
   asyncHandler(async (req, res) => {
@@ -127,7 +127,7 @@ router.patch(
   "/:updateId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("UPDATES"),
   validate({ body: updateSchema.partial() }),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
@@ -160,7 +160,7 @@ router.delete(
   "/:updateId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("UPDATES"),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
     const existing = await prisma.eventUpdate.findFirst({

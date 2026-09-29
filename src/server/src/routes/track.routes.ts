@@ -7,7 +7,7 @@ import { requireAuth } from "../middleware/auth.js";
 import {
   eventContext,
   loadEventContext,
-  requireEventAdmin,
+  requirePermission,
 } from "../middleware/event-context.js";
 import { validate } from "../middleware/validate.js";
 import { AuditAction, recordAudit } from "../services/audit.service.js";
@@ -18,7 +18,6 @@ const router: Router = Router({ mergeParams: true });
 const trackSchema = z.object({
   name: z.string().trim().min(1).max(80),
   description: z.string().trim().max(2000).optional(),
-  restricted: z.boolean().optional(),
   position: z.number().int().min(0).max(999).optional(),
 });
 
@@ -39,7 +38,7 @@ router.post(
   "/",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SETTINGS"),
   validate({ body: trackSchema }),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
@@ -49,7 +48,6 @@ router.post(
         name: req.body.name,
         slug: slugify(req.body.name),
         description: req.body.description ?? null,
-        restricted: req.body.restricted ?? false,
         position: req.body.position ?? 0,
       },
     });
@@ -76,7 +74,7 @@ router.patch(
   "/:trackId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SETTINGS"),
   validate({ body: trackSchema.partial() }),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
@@ -88,7 +86,6 @@ router.patch(
           ? { name: req.body.name, slug: slugify(req.body.name) }
           : {}),
         ...(req.body.description !== undefined ? { description: req.body.description } : {}),
-        ...(req.body.restricted !== undefined ? { restricted: req.body.restricted } : {}),
         ...(req.body.position !== undefined ? { position: req.body.position } : {}),
       },
     });
@@ -109,7 +106,7 @@ router.delete(
   "/:trackId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SETTINGS"),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
     const track = await loadTrack(ctx.event.id, req.params.trackId as string);

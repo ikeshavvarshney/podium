@@ -1,4 +1,6 @@
 import { EventRole } from "@prisma/client";
+import { EVENT_AREAS, FULL_ACCESS } from "../lib/permissions.js";
+import { assertFullAccess } from "../services/authorization.service.js";
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
@@ -8,18 +10,22 @@ import { requireAuth } from "../middleware/auth.js";
 import {
   eventContext,
   loadEventContext,
-  requireEventAdmin,
+  requirePermission,
 } from "../middleware/event-context.js";
 import { validate } from "../middleware/validate.js";
 import { AuditAction, recordAudit } from "../services/audit.service.js";
 
 const router: Router = Router({ mergeParams: true });
 
+const permissionList = z
+  .array(z.enum([FULL_ACCESS, ...EVENT_AREAS] as [string, ...string[]]))
+  .max(EVENT_AREAS.length + 1)
+  .transform((list) => (list.includes(FULL_ACCESS) ? [FULL_ACCESS] : [...new Set(list)]));
+
 const grantSchema = z.object({
   email: z.string().trim().email(),
   role: z.nativeEnum(EventRole),
-  /** Track ids a judge is restricted to. Empty means every track. */
-  trackScope: z.array(z.string().uuid()).max(50).optional(),
+  permissions: permissionList.optional(),
 });
 
 const memberQuerySchema = z.object({
@@ -30,7 +36,7 @@ router.get(
   "/",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("ROLES"),
   validate({ query: memberQuerySchema }),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
@@ -52,27 +58,18 @@ router.post(
   "/",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("ROLES"),
   validate({ body: grantSchema }),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
     const email = String(req.body.email).toLowerCase();
+    if (req.body.role === EventRole.ADMIN) assertFullAccess(ctx);
 
     const user = await prisma.user.findUnique({
       where: { email },
       select: { id: true, name: true },
     });
     if (!user) throw notFound("No account exists with that email address.");
-
-    const trackScope: string[] = req.body.trackScope ?? [];
-    if (trackScope.length > 0) {
-      const count = await prisma.track.count({
-        where: { id: { in: trackScope }, eventId: ctx.event.id },
-      });
-      if (count !== trackScope.length) {
-        throw badRequest("One or more tracks do not belong to this event.");
-      }
-    }
 
     const existing = await prisma.eventMembership.findUnique({
       where: {
@@ -86,7 +83,7 @@ router.post(
         eventId: ctx.event.id,
         userId: user.id,
         role: req.body.role,
-        trackScope,
+        permissions: req.body.role === EventRole.ADMIN ? (req.body.permissions ?? []) : [],
         invitedById: ctx.user?.id ?? null,
         acceptedAt: new Date(),
       },
@@ -101,7 +98,7 @@ router.post(
       targetType: "event_membership",
       targetId: membership.id,
       summary: `${user.name} granted ${req.body.role} on "${ctx.event.name}"`,
-      metadata: { role: req.body.role, trackScope },
+      metadata: { role: req.body.role, permissions: membership.permissions },
       ipHash: req.ipHash,
     });
 
@@ -113,28 +110,23 @@ router.patch(
   "/:membershipId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
-  validate({ body: z.object({ trackScope: z.array(z.string().uuid()).max(50) }) }),
+  requirePermission("ROLES"),
+  validate({
+    body: z.object({ permissions: permissionList }),
+  }),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
     const existing = await prisma.eventMembership.findFirst({
       where: { id: req.params.membershipId as string, eventId: ctx.event.id },
     });
     if (!existing) throw notFound("Membership not found.");
-
-    const trackScope: string[] = req.body.trackScope;
-    if (trackScope.length > 0) {
-      const count = await prisma.track.count({
-        where: { id: { in: trackScope }, eventId: ctx.event.id },
-      });
-      if (count !== trackScope.length) {
-        throw badRequest("One or more tracks do not belong to this event.");
-      }
-    }
+    if (existing.role !== EventRole.ADMIN) throw badRequest("Only an admin's access can be limited.");
+    assertFullAccess(ctx);
+    if (existing.userId === ctx.event.ownerId) throw badRequest("The event owner always has full access.");
 
     const membership = await prisma.eventMembership.update({
       where: { id: existing.id },
-      data: { trackScope },
+      data: { permissions: req.body.permissions },
     });
     await recordAudit({
       action: AuditAction.ROLE_GRANTED,
@@ -142,19 +134,18 @@ router.patch(
       actorId: ctx.user?.id ?? null,
       targetType: "event_membership",
       targetId: membership.id,
-      summary: `Track scope updated for a ${membership.role} on "${ctx.event.name}"`,
-      metadata: { trackScope },
+      summary: `Admin access on "${ctx.event.name}" set to ${membership.permissions.join(", ") || "nothing"}`,
+      metadata: { permissions: membership.permissions },
       ipHash: req.ipHash,
     });
     res.json(membership);
   }),
 );
-
 router.delete(
   "/:membershipId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("ROLES"),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
     const membership = await prisma.eventMembership.findFirst({
@@ -162,6 +153,7 @@ router.delete(
       include: { user: { select: { name: true } } },
     });
     if (!membership) throw notFound("Membership not found.");
+    if (membership.role === EventRole.ADMIN) assertFullAccess(ctx);
 
     // The owner must never be able to lock themselves out of their own event.
     if (membership.userId === ctx.event.ownerId && membership.role === EventRole.ADMIN) {

@@ -8,7 +8,7 @@ import { requireAuth } from "../middleware/auth.js";
 import {
   eventContext,
   loadEventContext,
-  requireEventAdmin,
+  requirePermission,
 } from "../middleware/event-context.js";
 import { validate } from "../middleware/validate.js";
 import { AuditAction, recordAudit } from "../services/audit.service.js";
@@ -43,7 +43,7 @@ router.post(
   "/",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SETTINGS"),
   validate({ body: questionSchema }),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
@@ -67,7 +67,7 @@ router.patch(
   "/:questionId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SETTINGS"),
   validate({ body: questionSchema.partial() }),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
@@ -93,7 +93,7 @@ router.delete(
   "/:questionId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SETTINGS"),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
     const existing = await prisma.customQuestion.findFirst({

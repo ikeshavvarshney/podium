@@ -65,7 +65,8 @@ describe("image uploads", () => {
   });
 
   it("travels with an event export and gets a new address on import", async () => {
-    const up = await upload(organizer, PNG, `?event=${event.slug}`).expect(201);
+    // The same image was uploaded above, so this reuses it and ties it to the event.
+    const up = await upload(organizer, PNG, `?event=${event.slug}`).expect(200);
     await as(organizer).patch(`/api/events/${event.id}`).send({ tagline: `Cover at ${up.body.url}` }).expect(200);
     const exported = (await as(organizer).get(`/api/events/${event.id}/export/event.json`).expect(200)).body;
     expect(exported.tables.Upload.length).toBeGreaterThanOrEqual(1);

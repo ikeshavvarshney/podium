@@ -355,6 +355,8 @@ export async function getEventDetail(ctx: EventContext) {
       roles: [...ctx.roles],
       isOwner: ctx.isOwner,
       isEventAdmin: ctx.isEventAdmin,
+      fullAccess: ctx.fullAccess,
+      permissions: [...ctx.permissions],
       isJudge: ctx.isJudge,
       isParticipant: ctx.isParticipant,
     },

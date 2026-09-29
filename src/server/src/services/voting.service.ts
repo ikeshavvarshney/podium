@@ -435,7 +435,7 @@ export async function getVoteResults(ctx: EventContext) {
   const config = await getVotingConfig(ctx.event.id);
   const window = votingWindow(ctx.event, config);
 
-  if (config.hideResults && window.open && !ctx.isEventAdmin) {
+  if (config.hideResults && window.open && !ctx.permissions.has("VOTING")) {
     throw forbidden("Community results stay hidden until voting closes.");
   }
 

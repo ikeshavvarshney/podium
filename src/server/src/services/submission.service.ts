@@ -64,9 +64,12 @@ export function submissionWindow(
 
 function assertWritable(
   ctx: EventContext,
-  submission: { lockedAt: Date | null } | null,
+  submission: { lockedAt: Date | null; status?: SubmissionStatus; flagReason?: string | null } | null,
   actorId: string,
 ): void {
+  if (submission?.status === SubmissionStatus.DISQUALIFIED) {
+    throw forbidden(`The organizers removed this project from the event: ${submission.flagReason ?? "no reason given"}`);
+  }
   if (submission?.lockedAt) {
     recordAuditSafe({
       action: AuditAction.SUBMISSION_EDIT_REJECTED,
@@ -399,6 +402,65 @@ export async function withdrawSubmission(ctx: EventContext, user: AuthUser, ipHa
     targetType: "submission",
     targetId: existing.id,
     summary: `Submission "${updated.name}" withdrawn`,
+    ipHash,
+  });
+
+  return updated;
+}
+
+/** Hides a submitted project from the gallery, judging, voting and results. The row and its scores stay. */
+export async function flagSubmission(ctx: EventContext, submissionId: string, reason: string, ipHash?: string) {
+  const existing = await prisma.submission.findFirst({ where: { id: submissionId, eventId: ctx.event.id } });
+  if (!existing) throw notFound("Submission not found.");
+  if (existing.status !== SubmissionStatus.SUBMITTED) {
+    throw badRequest("Only a submitted project can be flagged.");
+  }
+
+  const updated = await prisma.submission.update({
+    where: { id: existing.id },
+    data: {
+      status: SubmissionStatus.DISQUALIFIED,
+      flagReason: reason,
+      flaggedAt: new Date(),
+      flaggedById: ctx.user?.id ?? null,
+    },
+    include: submissionInclude,
+  });
+
+  await recordAudit({
+    action: AuditAction.SUBMISSION_FLAGGED,
+    eventId: ctx.event.id,
+    actorId: ctx.user?.id ?? null,
+    targetType: "submission",
+    targetId: existing.id,
+    summary: `Submission "${updated.name}" flagged and hidden: ${reason}`,
+    metadata: { reason },
+    ipHash,
+  });
+
+  return updated;
+}
+
+export async function restoreSubmission(ctx: EventContext, submissionId: string, ipHash?: string) {
+  const existing = await prisma.submission.findFirst({ where: { id: submissionId, eventId: ctx.event.id } });
+  if (!existing) throw notFound("Submission not found.");
+  if (existing.status !== SubmissionStatus.DISQUALIFIED) {
+    throw badRequest("That project is not flagged.");
+  }
+
+  const updated = await prisma.submission.update({
+    where: { id: existing.id },
+    data: { status: SubmissionStatus.SUBMITTED, flagReason: null, flaggedAt: null, flaggedById: null },
+    include: submissionInclude,
+  });
+
+  await recordAudit({
+    action: AuditAction.SUBMISSION_RESTORED,
+    eventId: ctx.event.id,
+    actorId: ctx.user?.id ?? null,
+    targetType: "submission",
+    targetId: existing.id,
+    summary: `Submission "${updated.name}" restored to public view`,
     ipHash,
   });
 

@@ -6,7 +6,7 @@ import { currentUser, requireAuth } from "../middleware/auth.js";
 import {
   eventContext,
   loadEventContext,
-  requireEventAdmin,
+  requirePermission,
 } from "../middleware/event-context.js";
 import { readRateLimit, writeRateLimit } from "../middleware/rate-limit.js";
 import { httpUrl, validate } from "../middleware/validate.js";
@@ -18,6 +18,8 @@ import {
 import {
   createSubmission,
   getMySubmission,
+  flagSubmission,
+  restoreSubmission,
   setSubmissionLock,
   submissionWindow,
   submitSubmission,
@@ -190,7 +192,7 @@ router.get(
   "/all",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SUBMISSIONS"),
   asyncHandler(async (req, res) => {
     res.json(
       await prisma.submission.findMany({
@@ -207,10 +209,33 @@ router.get(
 );
 
 router.post(
+  "/:submissionId/flag",
+  requireAuth,
+  asyncHandler(loadEventContext),
+  requirePermission("SUBMISSIONS"),
+  writeRateLimit,
+  validate({ body: z.object({ reason: z.string().trim().min(3, "Give a reason of at least 3 characters.").max(500) }) }),
+  asyncHandler(async (req, res) => {
+    res.json(await flagSubmission(eventContext(req), req.params.submissionId as string, req.body.reason, req.ipHash));
+  }),
+);
+
+router.post(
+  "/:submissionId/restore",
+  requireAuth,
+  asyncHandler(loadEventContext),
+  requirePermission("SUBMISSIONS"),
+  writeRateLimit,
+  asyncHandler(async (req, res) => {
+    res.json(await restoreSubmission(eventContext(req), req.params.submissionId as string, req.ipHash));
+  }),
+);
+
+router.post(
   "/:submissionId/lock",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SUBMISSIONS"),
   validate({ body: z.object({ locked: z.boolean() }) }),
   asyncHandler(async (req, res) => {
     res.json(

@@ -321,7 +321,7 @@ export async function publishResults(ctx: EventContext, publish: boolean, ipHash
 
 /** What the public sees once results are published: the stored run, nothing more. */
 export async function getPublishedResults(ctx: EventContext) {
-  if (!ctx.event.resultsPublished && !ctx.isEventAdmin) {
+  if (!ctx.event.resultsPublished && !ctx.permissions.has("RESULTS")) {
     throw forbidden("Results for this event have not been published yet.");
   }
 
@@ -338,6 +338,7 @@ export async function getPublishedResults(ctx: EventContext) {
               name: true,
               tagline: true,
               thumbnailUrl: true,
+              status: true,
               team: { select: { name: true } },
               track: { select: { name: true } },
             },
@@ -348,22 +349,26 @@ export async function getPublishedResults(ctx: EventContext) {
   });
   if (!run) throw notFound("No results have been computed yet.");
 
+  // A project flagged after the run drops out and everyone below it moves up.
+  const kept = run.scores.filter((s) => s.submission.status !== SubmissionStatus.DISQUALIFIED);
+  const rawRank = new Map([...kept].sort((a, b) => a.rawRank - b.rawRank).map((s, i) => [s.id, i + 1]));
+
   return {
     runId: run.id,
     method: run.method,
     comparative: (run.parameters as { comparative?: boolean } | null)?.comparative === true,
     computedAt: run.createdAt,
     ballotCount: run.ballotCount,
-    standings: run.scores.map((score) => ({
-      rank: score.normalizedRank,
-      rawRank: score.rawRank,
-      movement: score.rawRank - score.normalizedRank,
+    standings: kept.map((score, i) => ({
+      rank: i + 1,
+      rawRank: rawRank.get(score.id)!,
+      movement: rawRank.get(score.id)! - (i + 1),
       ballotCount: score.ballotCount,
       // Raw and normalized values stay organizer-only until publication.
-      ...(ctx.isEventAdmin || ctx.event.resultsPublished
+      ...(ctx.permissions.has("RESULTS") || ctx.event.resultsPublished
         ? { rawMean: score.rawMean, normalizedValue: score.normalizedValue }
         : {}),
-      submission: score.submission,
+      submission: { ...score.submission, status: undefined },
     })),
   };
 }

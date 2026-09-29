@@ -7,7 +7,7 @@ import { currentUser, requireAuth } from "../middleware/auth.js";
 import {
   eventContext,
   loadEventContext,
-  requireEventAdmin,
+  requirePermission,
   requireOrganizerCapability,
 } from "../middleware/event-context.js";
 import { writeRateLimit } from "../middleware/rate-limit.js";
@@ -166,7 +166,7 @@ router.patch(
   "/:eventId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SETTINGS"),
   writeRateLimit,
   validate({ body: updateEventSchema }),
   asyncHandler(async (req, res) => {

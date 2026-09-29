@@ -104,7 +104,7 @@ export async function getGalleryEntry(ctx: EventContext, submissionId: string) {
   const viewerOwns =
     !!ctx.user &&
     submission.team.members.some((m) => m.user.id === ctx.user?.id);
-  const privileged = ctx.isEventAdmin || ctx.isJudge || viewerOwns;
+  const privileged = ctx.permissions.has("SUBMISSIONS") || ctx.isJudge || viewerOwns;
 
   // Drafts are visible only to their own team and to organizers.
   if (submission.status !== SubmissionStatus.SUBMITTED && !privileged) {

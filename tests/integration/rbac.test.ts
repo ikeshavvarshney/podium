@@ -190,14 +190,6 @@ describe("event-scoped RBAC", () => {
   });
 
   describe("role grants", () => {
-    it("rejects a track scope belonging to another event", async () => {
-      const trackInB = await createTrack(organizerB, eventB.id, "Infra");
-      await as(organizerA)
-        .post(`/api/events/${eventA.id}/members`)
-        .send({ email: bob.email, role: "JUDGE", trackScope: [trackInB] })
-        .expect(400);
-    });
-
     it("refuses to revoke the owner's admin role", async () => {
       const members = await as(organizerA)
         .get(`/api/events/${eventA.id}/members`)

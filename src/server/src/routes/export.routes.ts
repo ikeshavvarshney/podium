@@ -5,7 +5,7 @@ import { requireAuth } from "../middleware/auth.js";
 import {
   eventContext,
   loadEventContext,
-  requireEventAdmin,
+  requirePermission,
 } from "../middleware/event-context.js";
 import { validate } from "../middleware/validate.js";
 import {
@@ -26,7 +26,7 @@ function sendCsv(res: import("express").Response, filename: string, body: string
   res.send(body);
 }
 
-const guards = [requireAuth, asyncHandler(loadEventContext), requireEventAdmin] as const;
+const guards = [requireAuth, asyncHandler(loadEventContext), requirePermission("INTEGRATIONS")] as const;
 
 router.get(
   "/submissions.csv",

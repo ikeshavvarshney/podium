@@ -5,7 +5,7 @@ import { prisma } from "../db.js";
 import { asyncHandler } from "../lib/async-handler.js";
 import { badRequest, notFound } from "../lib/errors.js";
 import { requireAuth } from "../middleware/auth.js";
-import { eventContext, loadEventContext, requireEventAdmin } from "../middleware/event-context.js";
+import { eventContext, loadEventContext, requirePermission } from "../middleware/event-context.js";
 import { writeRateLimit } from "../middleware/rate-limit.js";
 import { validate } from "../middleware/validate.js";
 import { AuditAction, recordAudit } from "../services/audit.service.js";
@@ -56,7 +56,7 @@ roundRoutes.post(
   "/",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("ROUNDS"),
   writeRateLimit,
   validate({ body: roundSchema }),
   asyncHandler(async (req, res) => {
@@ -83,7 +83,7 @@ roundRoutes.patch(
   "/:roundId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("ROUNDS"),
   validate({ body: roundSchema.partial() }),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
@@ -113,7 +113,7 @@ roundRoutes.delete(
   "/:roundId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("ROUNDS"),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
     const existing = await prisma.round.findFirst({
@@ -153,7 +153,7 @@ faqRoutes.post(
   "/",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SETTINGS"),
   writeRateLimit,
   validate({ body: faqSchema }),
   asyncHandler(async (req, res) => {
@@ -179,7 +179,7 @@ faqRoutes.patch(
   "/:faqId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SETTINGS"),
   validate({ body: faqSchema.partial() }),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
@@ -205,7 +205,7 @@ faqRoutes.delete(
   "/:faqId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SETTINGS"),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
     const existing = await prisma.faqItem.findFirst({

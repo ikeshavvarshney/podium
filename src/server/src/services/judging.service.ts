@@ -66,7 +66,7 @@ export async function generateAssignments(
     }),
     prisma.eventMembership.findMany({
       where: { eventId: ctx.event.id, role: EventRole.JUDGE },
-      select: { userId: true, trackScope: true },
+      select: { userId: true },
     }),
   ]);
 
@@ -79,13 +79,11 @@ export async function generateAssignments(
 
   const assignable: AssignableSubmission[] = submissions.map((s) => ({
     id: s.id,
-    trackId: s.trackId,
     memberIds: s.team.members.map((m) => m.userId),
   }));
 
   const assignableJudges: AssignableJudge[] = judges.map((j) => ({
     id: j.userId,
-    trackScope: j.trackScope,
     existingSubmissionIds: existing
       .filter((e) => e.judgeId === j.userId)
       .map((e) => e.submissionId),
@@ -151,12 +149,6 @@ export async function assignJudgeManually(
   if (submission.team.members.some((m) => m.userId === judgeId)) {
     throw badRequest("A judge cannot be assigned their own team's submission.");
   }
-  if (
-    membership.trackScope.length > 0 &&
-    (!submission.trackId || !membership.trackScope.includes(submission.trackId))
-  ) {
-    throw badRequest("That submission is outside this judge's track scope.");
-  }
 
   const count = await prisma.judgeAssignment.count({
     where: { eventId: ctx.event.id, judgeId },
@@ -221,7 +213,7 @@ export async function unassignJudge(ctx: EventContext, assignmentId: string, ipH
  */
 export async function getMyQueue(ctx: EventContext, judge: AuthUser) {
   const assignments = await prisma.judgeAssignment.findMany({
-    where: { eventId: ctx.event.id, judgeId: judge.id },
+    where: { eventId: ctx.event.id, judgeId: judge.id, submission: { status: { not: SubmissionStatus.DISQUALIFIED } } },
     orderBy: { position: "asc" },
     include: {
       submission: {
@@ -244,13 +236,6 @@ export async function getMyQueue(ctx: EventContext, judge: AuthUser) {
     },
   });
 
-  // Defence in depth: the assignment itself should already respect the scope.
-  const visible = assignments.filter(
-    (a) =>
-      ctx.judgeTrackScope.length === 0 ||
-      (a.submission.trackId !== null && ctx.judgeTrackScope.includes(a.submission.trackId)),
-  );
-
   const myScores = await prisma.judgeScore.findMany({
     where: { eventId: ctx.event.id, judgeId: judge.id },
     include: { criterionScores: true },
@@ -259,9 +244,9 @@ export async function getMyQueue(ctx: EventContext, judge: AuthUser) {
 
   return {
     window: judgingWindow(ctx.event),
-    total: visible.length,
-    completed: visible.filter((a) => scoreBySubmission.has(a.submissionId)).length,
-    items: visible.map((a) => {
+    total: assignments.length,
+    completed: assignments.filter((a) => scoreBySubmission.has(a.submissionId)).length,
+    items: assignments.map((a) => {
       const score = scoreBySubmission.get(a.submissionId);
       return {
         assignmentId: a.id,
@@ -289,18 +274,14 @@ export async function getMyQueue(ctx: EventContext, judge: AuthUser) {
 async function requireOwnAssignment(ctx: EventContext, judgeId: string, submissionId: string) {
   const assignment = await prisma.judgeAssignment.findUnique({
     where: { judgeId_submissionId: { judgeId, submissionId } },
-    include: { submission: { select: { id: true, trackId: true, eventId: true } } },
+    include: { submission: { select: { id: true, trackId: true, eventId: true, status: true } } },
   });
 
   if (!assignment || assignment.eventId !== ctx.event.id) {
     throw forbidden("You are not assigned to this submission.");
   }
-  if (
-    ctx.judgeTrackScope.length > 0 &&
-    (!assignment.submission.trackId ||
-      !ctx.judgeTrackScope.includes(assignment.submission.trackId))
-  ) {
-    throw forbidden("This submission is outside your assigned tracks.");
+  if (assignment.submission.status === SubmissionStatus.DISQUALIFIED) {
+    throw forbidden("The organizers removed this project from judging.");
   }
   return assignment;
 }
@@ -456,7 +437,7 @@ export async function getMyScore(ctx: EventContext, judge: AuthUser, submissionI
 export async function getJudgeScores(ctx: EventContext, caller: AuthUser, judgeId: string, ipHash?: string) {
   const targetId = judgeId === "me" ? caller.id : judgeId;
 
-  if (targetId !== caller.id && !ctx.isEventAdmin) {
+  if (targetId !== caller.id && !ctx.permissions.has("JUDGING")) {
     await recordAudit({
       action: AuditAction.ACCESS_DENIED,
       eventId: ctx.event.id,
@@ -530,7 +511,6 @@ export async function getJudgingProgress(ctx: EventContext) {
       name: membership.user.name,
       email: membership.user.email,
       org: membership.user.org,
-      trackScope: membership.trackScope,
       assigned: assigned.length,
       completed: done.length,
       skipped: assigned.filter((a) => a.skippedAt).length,

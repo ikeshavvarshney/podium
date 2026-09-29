@@ -6,17 +6,9 @@ import {
   type AssignableSubmission,
 } from "../../src/server/src/algorithms/judge-assignment.js";
 
-const sub = (
-  id: string,
-  trackId: string | null = null,
-  memberIds: string[] = [],
-): AssignableSubmission => ({ id, trackId, memberIds });
+const sub = (id: string, memberIds: string[] = []): AssignableSubmission => ({ id, memberIds });
 
-const judge = (
-  id: string,
-  trackScope: string[] = [],
-  existingSubmissionIds: string[] = [],
-): AssignableJudge => ({ id, trackScope, existingSubmissionIds });
+const judge = (id: string, existingSubmissionIds: string[] = []): AssignableJudge => ({ id, existingSubmissionIds });
 
 function countsBySubmission(plan: ReturnType<typeof planAssignments>) {
   const counts = new Map<string, number>();
@@ -27,24 +19,10 @@ function countsBySubmission(plan: ReturnType<typeof planAssignments>) {
 }
 
 describe("canJudgeReview", () => {
-  it("allows an unrestricted judge on any track", () => {
-    expect(canJudgeReview(judge("j1"), sub("s1", "t1"))).toBe(true);
-    expect(canJudgeReview(judge("j1"), sub("s2", null))).toBe(true);
-  });
-
   it("blocks a judge from reviewing their own team's submission", () => {
-    expect(canJudgeReview(judge("j1"), sub("s1", "t1", ["j1"]))).toBe(false);
+    expect(canJudgeReview(judge("j1"), sub("s1", ["j1"]))).toBe(false);
   });
 
-  it("restricts a scoped judge to their tracks", () => {
-    const scoped = judge("j1", ["t1"]);
-    expect(canJudgeReview(scoped, sub("s1", "t1"))).toBe(true);
-    expect(canJudgeReview(scoped, sub("s2", "t2"))).toBe(false);
-  });
-
-  it("blocks a scoped judge from untracked submissions", () => {
-    expect(canJudgeReview(judge("j1", ["t1"]), sub("s1", null))).toBe(false);
-  });
 });
 
 describe("planAssignments", () => {
@@ -69,25 +47,13 @@ describe("planAssignments", () => {
   });
 
   it("never assigns a judge to their own team's submission", () => {
-    const submissions = [sub("s1", null, ["j1"]), sub("s2"), sub("s3"), sub("s4")];
+    const submissions = [sub("s1", ["j1"]), sub("s2"), sub("s3"), sub("s4")];
     const judges = ["j1", "j2", "j3"].map((id) => judge(id));
 
     const plan = planAssignments(submissions, judges, { reviewsPerSubmission: 2 });
     expect(plan.assignments.some((a) => a.judgeId === "j1" && a.submissionId === "s1")).toBe(
       false,
     );
-  });
-
-  it("respects track restrictions", () => {
-    const submissions = [sub("s1", "t1"), sub("s2", "t1"), sub("s3", "t2"), sub("s4", "t2")];
-    const judges = [judge("j1", ["t1"]), judge("j2", ["t2"]), judge("j3")];
-
-    const plan = planAssignments(submissions, judges, { reviewsPerSubmission: 2 });
-
-    for (const a of plan.assignments) {
-      if (a.judgeId === "j1") expect(["s1", "s2"]).toContain(a.submissionId);
-      if (a.judgeId === "j2") expect(["s3", "s4"]).toContain(a.submissionId);
-    }
   });
 
   it("keeps judge workloads balanced", () => {
@@ -102,7 +68,7 @@ describe("planAssignments", () => {
 
   it("does not duplicate assignments a judge already holds", () => {
     const submissions = ["s1", "s2", "s3"].map((id) => sub(id));
-    const judges = [judge("j1", [], ["s1"]), judge("j2"), judge("j3")];
+    const judges = [judge("j1", ["s1"]), judge("j2"), judge("j3")];
 
     const plan = planAssignments(submissions, judges, { reviewsPerSubmission: 2 });
     expect(plan.assignments.some((a) => a.judgeId === "j1" && a.submissionId === "s1")).toBe(
@@ -112,24 +78,12 @@ describe("planAssignments", () => {
 
   it("counts existing assignments toward the target", () => {
     const submissions = [sub("s1")];
-    const judges = [judge("j1", [], ["s1"]), judge("j2"), judge("j3")];
+    const judges = [judge("j1", ["s1"]), judge("j2"), judge("j3")];
 
     const plan = planAssignments(submissions, judges, { reviewsPerSubmission: 2 });
     // One reviewer already exists, so only one more is needed.
     expect(plan.assignments).toHaveLength(1);
     expect(plan.shortfalls).toHaveLength(0);
-  });
-
-  it("reports a shortfall when too few judges are eligible", () => {
-    const submissions = [sub("s1", "t1")];
-    const judges = [judge("j1", ["t1"]), judge("j2", ["t2"])];
-
-    const plan = planAssignments(submissions, judges, { reviewsPerSubmission: 3 });
-
-    expect(plan.shortfalls).toHaveLength(1);
-    expect(plan.shortfalls[0]!.assigned).toBe(1);
-    expect(plan.shortfalls[0]!.needed).toBe(3);
-    expect(plan.shortfalls[0]!.reason).toMatch(/eligible/i);
   });
 
   it("reports a shortfall when there are no judges at all", () => {

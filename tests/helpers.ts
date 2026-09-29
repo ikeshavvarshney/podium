@@ -129,11 +129,11 @@ export async function grantRole(
   eventId: string,
   target: TestActor,
   role: "PARTICIPANT" | "JUDGE" | "ADMIN",
-  trackScope: string[] = [],
+  permissions: string[] = role === "ADMIN" ? ["ALL"] : [],
 ): Promise<string> {
   const res = await as(admin)
     .post(`/api/events/${eventId}/members`)
-    .send({ email: target.email, role, trackScope })
+    .send({ email: target.email, role, permissions })
     .expect(201);
   return res.body.id;
 }

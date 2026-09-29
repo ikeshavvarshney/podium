@@ -5,7 +5,7 @@ import { prisma } from "../db.js";
 import { asyncHandler } from "../lib/async-handler.js";
 import { notFound } from "../lib/errors.js";
 import { requireAuth } from "../middleware/auth.js";
-import { eventContext, loadEventContext, requireEventAdmin } from "../middleware/event-context.js";
+import { eventContext, loadEventContext, requirePermission } from "../middleware/event-context.js";
 import { writeRateLimit } from "../middleware/rate-limit.js";
 import { validate } from "../middleware/validate.js";
 import { AuditAction, recordAudit } from "../services/audit.service.js";
@@ -48,7 +48,7 @@ personRoutes.post(
   "/",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SETTINGS"),
   writeRateLimit,
   validate({ body: personSchema }),
   asyncHandler(async (req, res) => {
@@ -74,7 +74,7 @@ personRoutes.patch(
   "/:personId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SETTINGS"),
   validate({ body: personSchema.partial() }),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
@@ -90,7 +90,7 @@ personRoutes.delete(
   "/:personId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SETTINGS"),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
     const existing = await prisma.eventPerson.findFirst({
@@ -130,7 +130,7 @@ partnerRoutes.post(
   "/",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SETTINGS"),
   writeRateLimit,
   validate({ body: partnerSchema }),
   asyncHandler(async (req, res) => {
@@ -156,7 +156,7 @@ partnerRoutes.patch(
   "/:partnerId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SETTINGS"),
   validate({ body: partnerSchema.partial() }),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
@@ -172,7 +172,7 @@ partnerRoutes.delete(
   "/:partnerId",
   requireAuth,
   asyncHandler(loadEventContext),
-  requireEventAdmin,
+  requirePermission("SETTINGS"),
   asyncHandler(async (req, res) => {
     const ctx = eventContext(req);
     const existing = await prisma.partner.findFirst({

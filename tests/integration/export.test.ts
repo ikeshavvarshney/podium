@@ -161,8 +161,7 @@ describe("CSV export", () => {
       const res = await as(organizer)
         .get(`/api/events/${event.id}/export/judges.csv`)
         .expect(200);
-      expect(res.text).toContain("judge_id,name,email");
-      expect(res.text).toContain("all tracks");
+      expect(res.text).toContain("judge_id,name,email,org,assigned,completed,mean_score");
     });
 
     it("exports one row per criterion so the maths can be rechecked", async () => {
