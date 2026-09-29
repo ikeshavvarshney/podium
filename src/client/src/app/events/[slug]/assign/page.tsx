@@ -214,7 +214,7 @@ export default function AssignPage() {
     <main className="screen max-w-[1400px] pt-[clamp(26px,4vw,40px)] pb-[120px]">
       <PageHeader
         back={{ href: `/events/${slug}/manage`, label: "Dashboard" }}
-        eyebrow={`Assignment · ${progress.target} reviews per project`}
+        eyebrow={`Assignment · Auto-balance target: ${progress.target} judges per project`}
         title="Judge assignment"
         lead={
           <>
