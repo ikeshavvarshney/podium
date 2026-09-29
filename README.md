@@ -164,12 +164,23 @@ Claimed honestly in `.dogfood.toml`: T1, T2, T3 and T4. The organisers' checker 
 | T2 Judging | Complete. Configurable weighted rubrics, judge assignment (manual and auto-balanced), judging console, server-enforced isolation, progress dashboard, cross-judge normalization with small-sample shrinkage, panel integrity checks (lockstep judges, outlier ballots, conflicts), ballots frozen on publication and results pinned to a ballot digest, CSV export, a hash-chained audit log the database keeps append-only. |
 | T3 Public | Complete for voting. One person, one vote by default (the organizer can allow several votes each, or any number for approval voting), votes changeable until the poll closes or final once cast, quadratic voting as an option with an organizer-set credit budget (locked once the poll is live), three access modes (signed in, email proved by a one-time code, open link with one ballot per browser and a per-address cap), hidden tallies, per-voter ballot shuffling, duplicate detection, rate limiting, organizer ballot inspection. Gallery comments with organizer moderation. |
 | T4 Stretch | Complete. REST API covering everything the UI does, with scoped API tokens, plus CSV export and whole-event JSON export that imports back into any instance, bulk roster import that creates accounts and teams, webhooks for every event-scoped action (replay-safe HMAC signatures, a retrying outbox, SSRF guard), image uploads, an embeddable public gallery, certificate generation and signed/publicly verifiable judge participation records. A published OpenAPI 3.1 document at [docs/openapi.json](docs/openapi.json), also served at `/api/openapi.json`, generated from the live routes and validators. |
-| Bonus | Normalization Proof: a seeded simulation showing shrunk per-judge standardization recovers the true order better than the raw mean (mean Spearman 0.749 to 0.889, better in every one of 500 events), plus what it does to `fixtures.json` (the judge effect in raw ballots falls from 27% of variance to 3.5%), reproduced by `npm run proof` in `src/server/` and asserted in CI. See [docs/normalization-proof.md](docs/normalization-proof.md). Pairwise mode: comparative judging ranks with a Bradley-Terry fit (MM algorithm), shown beside Borda and proven better at recovering the true order on the same simulation. |
+
+### Bonus challenges
+
+All four are claimed in `.dogfood.toml` (`bonus`), each backed by code, tests and a document.
+
+| Challenge | What backs the claim |
+| --- | --- |
+| Normalization Proof | A seeded simulation of 500 events shows shrunk per-judge standardization recovers the true order better than the raw mean (mean Spearman 0.749 to 0.889, better in every event). On `fixtures.json` it shows raw scores, normalized scores and the rank movements, and the judge effect falls from 27% of variance to 3.5%. Reproduced by `npm run proof` in `src/server/` and asserted by `tests/unit/normalization-proof.test.ts`. [docs/normalization-proof.md](docs/normalization-proof.md) |
+| Pairwise Mode | Comparative judging as an alternative to the rubric: judges order groups of projects (group size 2 is classic Gavel-style pairwise: which of these two is better), and the global ranking is recovered with a Bradley-Terry fit (MM algorithm, `algorithms/bradley-terry.ts`), with Borda shown beside it. On the same simulation it recovers the true order better than Borda (0.854 against 0.827). [JUDGING.md](JUDGING.md#8-comparative-mode) |
+| Threat Model | Actors, assets, trust boundaries and STRIDE, then the five named abuse cases (Sybil accounts, ballot stuffing, submission scraping, judge collusion, deadline gaming), each marked stopped, reduced or not addressed, with the code behind it and what remains open. [docs/SECURITY.md](docs/SECURITY.md) |
+| API First | Every UI action goes through the REST API; the web client has no private back channel. An OpenAPI 3.1 document (159 operations) is generated from the live routes and their Zod validators, served at `/api/openapi.json` and committed at [docs/openapi.json](docs/openapi.json), and a test fails if the two drift. Scoped API tokens make it usable from scripts. [docs/API.md](docs/API.md) |
 
 ### What works right now
 
 - Email/password authentication, Argon2id hashing, JWT in an HTTP-only cookie
-- Passwordless sign-in via a single-use link, shown on-screen rather than emailed
+- Passwordless sign-in via a single-use link, emailed when `SMTP_URL` is set and written to
+  the API log otherwise
 - Per-device sessions: list every signed-in device, revoke one, or revoke every session
   but the current one
 - Token revocation via a per-user token version, on password change and on demand

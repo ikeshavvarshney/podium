@@ -34,4 +34,5 @@ license = "MIT"
 repository = "https://github.com/ikeshavvarshney/podium"
 web = "http://localhost:3000"
 seed_password = "podium-demo-2026"
-bonus = "normalization-proof"   # docs/normalization-proof.md; also present: docs/openapi.json, docs/SECURITY.md threat model
+# Evidence: docs/normalization-proof.md, JUDGING.md section 8, docs/SECURITY.md, docs/openapi.json
+bonus = ["normalization-proof", "pairwise-mode", "threat-model", "api-first"]
