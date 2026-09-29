@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ApiError, del, get, post } from "@/lib/api";
+import { ApiError, del, get, mediaUrl, post } from "@/lib/api";
 import { hue, initials } from "@/lib/hues";
 import { useSession } from "@/components/providers/session-provider";
 import type { Comment, Submission } from "@/lib/types";
+import { utcDateTime } from "@/lib/format";
 
 /**
  * The gallery detail modal, opened from a submission card. Comments load
@@ -95,7 +96,7 @@ export function GalleryModal({
           style={{
             aspectRatio: "16 / 9",
             borderRadius: "14px 14px 0 0",
-            backgroundImage: entry?.thumbnailUrl ? `url(${entry.thumbnailUrl})` : undefined,
+            backgroundImage: entry?.thumbnailUrl ? `url(${mediaUrl(entry.thumbnailUrl)})` : undefined,
           }}
         />
         <div className="p-[clamp(18px,3vw,26px)]">
@@ -159,10 +160,7 @@ export function GalleryModal({
                           <div className="flex flex-wrap items-baseline gap-2">
                             <span className="text-ui font-medium">{c.user.name}</span>
                             <span className="font-mono text-label text-muted">
-                              {new Date(c.createdAt).toLocaleString(undefined, {
-                                dateStyle: "medium",
-                                timeStyle: "short",
-                              })}
+                              {utcDateTime(c.createdAt)}
                             </span>
                             {c.hiddenAt && (
                               <span className="status-chip bg-danger-soft text-danger">hidden</span>

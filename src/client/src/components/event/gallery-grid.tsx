@@ -7,6 +7,7 @@ import { GalleryModal } from "./gallery-modal";
 import type { SubmissionCard } from "@/lib/types";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusChip } from "@/components/ui/status-chip";
+import { mediaUrl } from "@/lib/api";
 
 export function GalleryGrid({
   slug,
@@ -57,7 +58,7 @@ export function GalleryGrid({
                   className="relative w-full overflow-hidden rounded-[10px] border border-line bg-elevated bg-cover bg-center transition-shadow duration-200 group-hover:shadow-[var(--home-shadow)]"
                   style={{
                     aspectRatio: "4 / 3",
-                    backgroundImage: project.thumbnailUrl ? `url(${project.thumbnailUrl})` : undefined,
+                    backgroundImage: project.thumbnailUrl ? `url(${mediaUrl(project.thumbnailUrl)})` : undefined,
                   }}
                 >
                   {project.thumbnailUrl ? null : (

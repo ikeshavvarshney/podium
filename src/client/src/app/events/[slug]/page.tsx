@@ -17,6 +17,8 @@ import type {
 import { StatusChip } from "@/components/ui/status-chip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Markdown } from "@/components/ui/markdown";
+import { usd, utcDateTime } from "@/lib/format";
+import { mediaUrl } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -25,20 +27,11 @@ type Tab = (typeof TABS)[number];
 
 function formatDate(value: string | null): string {
   if (!value) return "not scheduled";
-  return new Date(value).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return utcDateTime(value);
 }
 
-function formatMoney(cents: number | null, currency: string): string | null {
-  if (cents === null) return null;
-  return new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(cents / 100);
+function formatMoney(cents: number | null): string | null {
+  return cents === null ? null : usd(cents);
 }
 
 interface Round {
@@ -138,7 +131,7 @@ export default async function EventPage({
     },
     {
       label: "Prize pool",
-      value: formatMoney(poolCents || null, event.prizes[0]?.currency ?? "USD") ?? "-",
+      value: formatMoney(poolCents || null) ?? "-",
       hue: "brand",
     },
     { label: "Team size", value: `${event.minTeamSize}-${event.maxTeamSize}`, hue: "brand" },
@@ -160,13 +153,25 @@ export default async function EventPage({
         All events
       </Link>
 
+      {event.bannerUrl ? (
+        <img
+          src={mediaUrl(event.bannerUrl)}
+          alt=""
+          className="mt-5 block aspect-[3/1] w-full rounded-[14px] border border-line object-cover"
+        />
+      ) : null}
+
       <div className="mt-5 flex flex-wrap items-end gap-[clamp(20px,3vw,30px)] border-b border-line pb-[clamp(22px,3vw,30px)]">
         <div
-          className="grid h-[92px] w-[92px] flex-none place-items-center rounded-[14px] font-mono text-[34px]"
+          className="grid h-[92px] w-[92px] flex-none place-items-center overflow-hidden rounded-[14px] font-mono text-[34px]"
           style={{ background: cover.bg, color: cover.fg }}
           aria-hidden="true"
         >
-          {event.name.trim()[0]?.toUpperCase() ?? "?"}
+          {event.logoUrl ? (
+            <img src={mediaUrl(event.logoUrl)} alt="" className="h-full w-full object-cover" />
+          ) : (
+            event.name.trim()[0]?.toUpperCase() ?? "?"
+          )}
         </div>
 
         <div className="min-w-0 flex-[1_1_320px]">
@@ -386,7 +391,7 @@ export default async function EventPage({
                     </span>
                     {c.amountCents !== null && (
                       <span className="whitespace-nowrap font-mono text-ui">
-                        {formatMoney(c.amountCents, c.currency)}
+                        {formatMoney(c.amountCents)}
                       </span>
                     )}
                   </div>
@@ -432,7 +437,7 @@ export default async function EventPage({
                 </div>
                 {prize.amountCents !== null && (
                   <span className="text-heading font-medium tracking-display">
-                    {formatMoney(prize.amountCents, prize.currency)}
+                    {formatMoney(prize.amountCents)}
                   </span>
                 )}
               </article>

@@ -3,6 +3,8 @@ import { coverHue, hue, STATUS_HUE, STATUS_LABEL } from "@/lib/hues";
 import { timeLeft, type Step } from "@/lib/participant-step";
 import type { EventSummary } from "@/lib/types";
 import { StatusChip } from "@/components/ui/status-chip";
+import { usd, utcDate, utcDateTime, utcYear } from "@/lib/format";
+import { mediaUrl } from "@/lib/api";
 
 const MODE_LABEL: Record<string, string> = {
   ONLINE: "Online · Remote",
@@ -14,22 +16,13 @@ function dateRange(event: EventSummary): string {
   const start = event.submissionsOpenAt ?? event.registrationClosesAt;
   const end = event.submissionDeadline;
   if (!start && !end) return "dates to be announced";
-  const fmt = (iso: string) =>
-    new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  if (start && end) {
-    const year = new Date(end).getFullYear();
-    return `${fmt(start)}-${fmt(end)}, ${year}`;
-  }
-  return fmt((start ?? end)!);
+  const fmt = (iso: string) => utcDate(iso, { month: "short", day: "numeric" });
+  if (start && end) return `${fmt(start)}-${fmt(end)}, ${utcYear(end)} (UTC)`;
+  return `${fmt((start ?? end)!)} (UTC)`;
 }
 
-function money(cents: number | undefined, currency: string | undefined): string | null {
-  if (!cents) return null;
-  return `${new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency: currency ?? "USD",
-    maximumFractionDigits: 0,
-  }).format(cents / 100)} prize pool`;
+function money(cents: number | undefined): string | null {
+  return cents ? `${usd(cents)} prize pool` : null;
 }
 
 /** Days until registration closes, which is what a visitor is deciding on. */
@@ -39,7 +32,7 @@ function closesIn(event: EventSummary): string {
   const ms = new Date(raw).getTime() - Date.now();
   const label = event.registrationClosesAt ? "Registration closes" : "Submissions close";
   if (ms <= 0) return event.registrationClosesAt ? "Registration closed" : "Submissions closed";
-  const when = new Date(raw).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const when = utcDateTime(raw, { month: "short", day: "numeric" });
   if (ms < 2 * 86_400_000) return `${label} ${when} · ${timeLeft(ms)}`;
   const days = Math.ceil(ms / 86_400_000);
   return `${label} ${when} · ${days} days`;
@@ -81,11 +74,15 @@ function DashboardCard({
   return (
     <article className="card lift flex flex-wrap overflow-hidden">
       <div
-        className="grid flex-[0_0_64px] place-items-center font-mono text-figure max-sm:hidden"
+        className="grid flex-[0_0_64px] place-items-center overflow-hidden font-mono text-figure max-sm:hidden"
         style={{ background: cover.bg, color: cover.fg }}
         aria-hidden="true"
       >
-        {event.name.trim()[0]?.toUpperCase() ?? "?"}
+        {event.logoUrl ? (
+          <img src={mediaUrl(event.logoUrl)} alt="" className="h-full w-full object-cover" />
+        ) : (
+          event.name.trim()[0]?.toUpperCase() ?? "?"
+        )}
       </div>
 
       <div className="min-w-0 flex-[1_1_320px] p-[clamp(16px,2.4vw,22px)]">
@@ -151,16 +148,20 @@ export function EventCard({
 
   const cover = hue(coverHue(event.name));
   const status = hue(STATUS_HUE[event.status] ?? "slate");
-  const pool = money(event.prizePoolCents, event.currency);
+  const pool = money(event.prizePoolCents);
 
   return (
     <article className="card lift flex flex-wrap overflow-hidden">
       <div
-        className="grid min-h-[108px] flex-[0_0_108px] place-items-center font-mono text-figure"
+        className="grid min-h-[108px] flex-[0_0_108px] place-items-center overflow-hidden font-mono text-figure"
         style={{ background: cover.bg, color: cover.fg }}
         aria-hidden="true"
       >
-        {event.name.trim()[0]?.toUpperCase() ?? "?"}
+        {event.logoUrl ? (
+          <img src={mediaUrl(event.logoUrl)} alt="" className="h-full w-full object-cover" />
+        ) : (
+          event.name.trim()[0]?.toUpperCase() ?? "?"
+        )}
       </div>
 
       <div className="min-w-0 flex-[1_1_320px] p-[clamp(16px,2.4vw,22px)]">

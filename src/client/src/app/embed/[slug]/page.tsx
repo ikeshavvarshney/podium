@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { get } from "@/lib/api";
+import { get, mediaUrl } from "@/lib/api";
 import { coverHue, hue } from "@/lib/hues";
 import type { EventDetail, Paginated, SubmissionCard } from "@/lib/types";
 
@@ -49,7 +49,7 @@ export default async function EmbedGallery({ params }: { params: Promise<{ slug:
                 <div
                   className="grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-[10px] border border-line bg-cover bg-center font-mono text-heading transition-transform duration-500 group-hover:-translate-y-0.5"
                   style={{
-                    background: project.thumbnailUrl ? `center / cover url(${project.thumbnailUrl})` : h.bg,
+                    background: project.thumbnailUrl ? `center / cover url(${mediaUrl(project.thumbnailUrl)})` : h.bg,
                     color: h.fg,
                   }}
                 >

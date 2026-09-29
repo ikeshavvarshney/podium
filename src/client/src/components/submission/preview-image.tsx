@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { mediaUrl } from "@/lib/api";
 
 /**
  * An image referenced by URL. The platform hosts no uploads, so a link can
@@ -28,6 +29,6 @@ export function PreviewImage({ url, alt, className = "" }: { url: string; alt: s
   }
   return (
     // links to hosts we cannot know in advance
-    <img src={url} alt={alt} loading="lazy" onError={() => setFailed(true)} className={`object-cover ${className}`.trim()} />
+    <img src={mediaUrl(url)} alt={alt} loading="lazy" onError={() => setFailed(true)} className={`object-cover ${className}`.trim()} />
   );
 }
