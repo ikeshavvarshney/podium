@@ -115,7 +115,7 @@ flowchart LR
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| GET / PUT | `/voting/config` | Access mode, method, credit budget, result hiding, and who may vote (`allowVisitors`, `allowParticipants`, `allowJudges`, `allowAdmins`; at least one must stay true). |
+| GET / PUT | `/voting/config` | Access mode, method, credit budget, votes per voter (`maxChoices`, 1 by default), whether votes can change (`allowVoteChange`), result hiding, and who may vote (`allowVisitors`, `allowParticipants`, `allowJudges`, `allowAdmins`; at least one must stay true). |
 | GET | `/voting/ballot` | A shuffled, per-voter-stable ballot order. Sets the open-link device cookie. |
 | POST | `/voting/verify`, `/voting/verify/confirm` | Email-gated voting: send a six-digit code, then trade it for a voter token (returned and set as a cookie; scripts send it as `x-voter-token`). |
 | POST | `/votes` | Priced and validated server-side; see `JUDGING.md` for the quadratic-voting cost function and the `maxChoices` limit. Email-gated events need a voter token (`x-voter-token` or the cookie); open-link voters are identified by a browser cookie and capped per address per hour (`429`). |

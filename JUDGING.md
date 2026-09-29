@@ -356,10 +356,15 @@ by the system silently blending two different kinds of evidence.
 
 Two methods are supported, and they are not the same thing. **SINGLE is the default**; an organizer opts in to quadratic and must then state the budget.
 
-**SINGLE.** A voter backs a project once, for one unit of weight, costing one credit.
-The tally is a headcount: one person, one vote per project (approval voting). An organizer can
-cap how many projects each voter may back (`maxChoices`); a cap of 1 is one person, one vote.
-The cap locks with the method once ballots exist.
+**SINGLE.** A normal poll. Each vote is one unit of weight, costing one credit. By default each
+voter has **one vote** (`maxChoices` = 1): one person, one vote. An organizer can allow up to a
+set number of votes each, or any number (approval voting: one vote per project), and the tally is
+a headcount either way. The limit locks with the method once ballots exist.
+
+**Changing a vote.** By default a voter may vote again until the poll closes, and the new ballot
+replaces the old one. An organizer can make votes **final once cast** (`allowVoteChange` = false):
+the server then refuses a second ballot from the same voter with a 409 and records the attempt as
+`VOTE_REJECTED`. This setting locks with the method too.
 
 **QUADRATIC.** A voter holds a credit budget, set by the organizer when they choose this method (the API refuses a switch to quadratic that does not name one), and buys weight on a project
 at a cost of `weight^2` credits:
@@ -385,7 +390,7 @@ express how strongly they feel while making it expensive to dominate a single ra
 
 ### Changing the method
 
-The method and the credit budget decide what a ballot means, so they **lock** as soon as the poll is live (enabled and inside its window) or any ballot exists. A change is refused with a 409 and the reason, and the interface disables the controls. Other settings (hide tallies, shuffle, who may vote) stay editable. Who may vote is set per role (visitors, participants, judges, admins), and a person must have every role they hold allowed, so an admin who also registered as a participant stays out while admins are excluded. Locking after the first ballot, not only while the poll is open, is what stops a closed poll being reinterpreted.
+The method, the credit budget, the vote limit and whether votes can change decide what a ballot means, so they **lock** as soon as the poll is live (enabled and inside its window) or any ballot exists. A change is refused with a 409 and the reason, and the interface disables the controls. Other settings (hide tallies, shuffle, who may vote) stay editable. Who may vote is set per role (visitors, participants, judges, admins), and a person must have every role they hold allowed, so an admin who also registered as a participant stays out while admins are excluded. Locking after the first ballot, not only while the poll is open, is what stops a closed poll being reinterpreted.
 
 ### Tallying and ties
 
@@ -411,7 +416,8 @@ flowchart TD
     K1 --> U["upsert Vote, unique on (event, submission, voterKey)"]
     K2 --> U
     K3 --> U
-    U --> T["ballot replaces the voter's previous one, in one transaction"]
+    U --> T["ballot replaces the voter's previous one, in one transaction
+(refused instead when votes are final)"]
 ```
 
 | Access mode | Key | Strength |
@@ -422,7 +428,8 @@ flowchart TD
 
 Uniqueness is a database constraint, `@@unique([eventId, submissionId, voterKey])`, not
 an application-level check. Re-voting replaces the voter's whole ballot inside one
-transaction rather than stacking a second one.
+transaction rather than stacking a second one, or is refused outright when the organizer made
+votes final.
 
 ### Anti-abuse
 

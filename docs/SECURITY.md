@@ -148,7 +148,7 @@ that backs the claim.
 
 - **Stopped for identified voters.** A voter is identified server-side (`resolveVoter`): account id,
   an email address proved with a one-time code, or a browser cookie capped per address. `votes` is unique per `(event, voter key, submission)`
-  and a new ballot **replaces** the previous one in a transaction, so re-submitting cannot stack.
+  and a new ballot **replaces** the previous one in a transaction, so re-submitting cannot stack (or is refused outright when the organizer made votes final).
   A client cannot nominate the identity it votes as. Own-team votes and cross-event submissions
   are refused. Weight, credits, budget and method are validated and priced on the server; a client
   `credits` figure is ignored. The method and budget lock once a ballot exists.

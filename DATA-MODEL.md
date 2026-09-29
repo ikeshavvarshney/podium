@@ -151,7 +151,7 @@ erDiagram
 
 | Table | Purpose |
 | --- | --- |
-| `voting_configs` | Per event: access mode, method, credit budget, `max_choices` (how many projects one voter may back under single voting; 1 is one vote per person), `max_votes_per_ip_per_hour` (new open-link voters one address may add), result hiding, ballot shuffling, and which roles may vote (visitors, participants, judges, admins). Method, budget and choice limit lock once ballots exist. |
+| `voting_configs` | Per event: access mode, method, credit budget, `max_choices` (how many votes one voter has under single voting; 1, the default, is one person, one vote; null is approval voting), `allow_vote_change` (whether a voter may vote again until the poll closes, or their first vote is final), `max_votes_per_ip_per_hour` (new open-link voters one address may add), result hiding, ballot shuffling, and which roles may vote (visitors, participants, judges, admins). Method, budget and choice limit lock once ballots exist. |
 | `voter_verifications` | Email-gated voting: a hashed six-digit code with an expiry and attempt count, then, once confirmed, the hash of the voter token that proves the address on later ballots. |
 | `votes` | One line per voter per project: weight, credits spent, hashed IP and user agent. Unique per `(event, submission, voter_key)`, so duplicate detection is a database constraint, not application code. `voter_key` is always derived server-side: `user:` from the session, `email:` from a verified address, `device:` from the open-link browser cookie. |
 | `comments` | Soft-hidden via `hidden_at` rather than deleted, so moderation stays auditable. |

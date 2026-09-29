@@ -198,7 +198,7 @@ than an application check.
 The client's arithmetic is decoration, exactly like the submission countdown.
 
 Casting a ballot replaces the voter's previous one inside a transaction, so re-voting
-never stacks. Tallies return 403 to everyone but an event admin while the window is open
+never stacks; when the organizer made votes final, a second ballot is refused instead. Tallies return 403 to everyone but an event admin while the window is open
 and `hideResults` is set, so early counts cannot steer later voters.
 
 ## Team board and matching

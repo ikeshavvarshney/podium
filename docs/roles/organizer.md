@@ -133,7 +133,8 @@ A **private** event is invisible, returning "not found", to anyone with no membe
 
 ### Community voting
 
-- Configure method (single, or quadratic with a credit budget), access mode (open link,
+- Configure method (single, or quadratic with a credit budget), votes per voter (one by default),
+  whether a voter may change their vote until the poll closes or it is final once cast, access mode (open link,
   email-gated, or signed-in), and **who can vote**: any mix of visitors (no role in the
   event, signed in or not), participants, judges, and admins or organizers. Someone holding
   several roles may vote only if every one of them is allowed, and at least one group must

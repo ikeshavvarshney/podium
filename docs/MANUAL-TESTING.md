@@ -118,7 +118,7 @@ Open the event, then **Settings**.
 
 1. **Event status:** change the state.
 2. **Visibility and sharing:** try Public, Link only and Private. Copy the share link and check each one from the private window.
-3. **Voting:** headcount (one vote per project) is the default; set "Projects each voter may back" to One for one vote per person. Switch to quadratic and set how many credits each person gets. The credits are required.
+3. **Voting:** one person, one vote is the default ("Votes per voter: One"); raise it or choose "Any number" for approval voting. Set "Changing a vote" to "Final once cast", vote once, and try again: the second ballot should be refused. Switch to quadratic and set how many credits each person gets. The credits are required.
 4. **Rubric:** add criteria and weights. The weights must add up to 100 or the app should refuse.
 5. **Webhooks:** add a URL subscribed to **all events**, do anything in the event (add a FAQ item, post an update), and check the delivery log. `http://169.254.169.254/` or `http://db:5432/` should be refused as internal. Point a hook at a dead URL: the delivery shows as retrying, and "retry now" sends it again.
 6. **Bulk import:** upload a CSV with `email,name,team` columns, including one address that has no account and two rows on the same team. The people should appear under **Roles**, the new account should exist, and the team should appear under **Teams**. A row for a full team is reported, not placed.
