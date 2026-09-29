@@ -5,14 +5,14 @@ through teams, submissions, judging, normalization and published results, with
 event-scoped RBAC, backend-enforced role isolation, configurable weighted rubrics and
 offline-first operation.
 
-Built for the [Dogfood Hackathon].
+Built for the [Dogfood Hackathon](https://dogfoodhack.com).
 
 ## Run it
 
 Requires Docker. Nothing else: no cloud account, no hosted database, no API key.
 
 ```bash
-git clone <this-repo>
+git clone https://github.com/ikeshavvarshney/podium.git
 cd podium
 docker compose up
 ```
