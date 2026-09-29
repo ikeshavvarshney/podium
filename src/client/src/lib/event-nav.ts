@@ -1,3 +1,4 @@
+import { can, type EventArea } from "@/lib/permissions";
 import type { EventDetail } from "@/lib/types";
 
 export interface NavItem {
@@ -10,6 +11,18 @@ export interface NavItem {
 export type NavEvent = Pick<EventDetail, "slug" | "status" | "resultsPublished" | "viewer">;
 
 const ADMIN_KEYS = ["dashboard", "assign", "rounds", "voting", "results", "updates", "roles", "audit", "settings"] as const;
+
+const TAB_AREA: Record<(typeof ADMIN_KEYS)[number], EventArea> = {
+  dashboard: "JUDGING",
+  assign: "JUDGING",
+  rounds: "ROUNDS",
+  voting: "VOTING",
+  results: "RESULTS",
+  updates: "UPDATES",
+  roles: "ROLES",
+  audit: "AUDIT",
+  settings: "SETTINGS",
+};
 
 /**
  * The sections of one event that this viewer can reach, in working order.
@@ -34,12 +47,12 @@ export function eventNav(event: NavEvent): NavItem[] {
       audit: at("audit", "/audit", "Audit"),
       settings: at("settings", "/settings", "Settings"),
     };
-    for (const key of ADMIN_KEYS) items.push(admin[key]);
+    for (const key of ADMIN_KEYS) if (can(viewer, TAB_AREA[key])) items.push(admin[key]);
   }
   if (viewer.isJudge) items.push(at("judge", "/judge", "Scoring"));
   if (viewer.isParticipant) {
     items.push(at("submit", "/submit", "My project"), at("teams", "/teams", "Team"));
-    if (!viewer.isEventAdmin) items.push(at("updates", "/updates", "Updates"));
+    if (!can(viewer, "UPDATES")) items.push(at("updates", "/updates", "Updates"));
   }
   if (!viewer.isEventAdmin && !viewer.isJudge && !viewer.isParticipant) {
     items.push(at("register", "/register", "Register"));
@@ -52,7 +65,10 @@ export function eventNav(event: NavEvent): NavItem[] {
 /** The few destinations a phone keeps within thumb reach; everything else lives under More. */
 export function primaryKeys(event: NavEvent): string[] {
   const { viewer } = event;
-  if (viewer.isEventAdmin) return ["dashboard", "assign", "results"];
+  if (viewer.isEventAdmin) {
+    const allowed = ADMIN_KEYS.filter((k) => can(viewer, TAB_AREA[k]));
+    return allowed.length ? allowed.slice(0, 3) : ["overview"];
+  }
   if (viewer.isJudge) return ["overview", "judge", viewer.isParticipant ? "submit" : "winners"];
   if (viewer.isParticipant) return ["overview", "submit", "teams"];
   return ["overview", event.status === "VOTING" ? "vote" : "register", "winners"];

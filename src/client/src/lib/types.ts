@@ -57,7 +57,6 @@ export interface Track {
   name: string;
   slug: string;
   description: string | null;
-  restricted: boolean;
 }
 
 interface Prize {
@@ -125,6 +124,8 @@ interface Viewer {
   roles: EventRole[];
   isOwner: boolean;
   isEventAdmin: boolean;
+  fullAccess?: boolean;
+  permissions?: string[];
   isJudge: boolean;
   isParticipant: boolean;
 }
@@ -210,6 +211,8 @@ export interface Submission {
   status: "DRAFT" | "SUBMITTED" | "WITHDRAWN" | "DISQUALIFIED";
   submittedAt: string | null;
   lockedAt: string | null;
+  flagReason?: string | null;
+  flaggedAt?: string | null;
   declarations: Record<string, boolean>;
   images: Array<{ id: string; url: string; caption: string | null }>;
   track: { id: string; name: string; slug: string } | null;
