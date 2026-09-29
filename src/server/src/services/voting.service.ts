@@ -56,7 +56,7 @@ export async function votingMethodLock(ctx: EventContext): Promise<{ locked: boo
     };
   }
   if (config.enabled && votingWindow(ctx.event, config).open) {
-    return { locked: true, reason: "The poll is live. Close it before changing the method or credit budget." };
+    return { locked: true, reason: "The poll is live. Close it before changing the method, credit budget, vote limit or whether votes can change." };
   }
   return { locked: false, reason: null };
 }
