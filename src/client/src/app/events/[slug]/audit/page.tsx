@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageStatus } from "@/components/ui/page-status";
 import { apiBase, ApiError, get } from "@/lib/api";
+import { utcDateTime } from "@/lib/format";
 
 interface AuditEntry {
   id: string;
@@ -126,7 +127,7 @@ export default function AuditPage() {
               <li key={entry.id} className="m-0 grid gap-3.5 border-b border-line py-3 [grid-template-columns:44px_92px_minmax(0,1fr)]">
                 <span className="font-mono text-meta text-muted">#{entry.chainSeq ?? "-"}</span>
                 <span className="font-mono text-meta text-muted">
-                  {new Date(entry.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  {utcDateTime(entry.createdAt, { month: "short", day: "numeric" })}
                 </span>
                 <div className="min-w-0">
                   <div className="text-ui leading-[1.5] [overflow-wrap:anywhere]">{entry.summary}</div>

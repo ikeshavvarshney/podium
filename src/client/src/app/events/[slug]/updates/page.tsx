@@ -7,6 +7,7 @@ import { ApiError, del, get, patch, post } from "@/lib/api";
 import { hue, type HueName } from "@/lib/hues";
 import type { EventDetail } from "@/lib/types";
 import { Notice } from "@/components/ui/notice";
+import { utcDate, utcDateTime, utcTime } from "@/lib/format";
 
 type UpdateTag = "ROUNDS" | "DEADLINE" | "JUDGING" | "LOGISTICS" | "VOTING";
 
@@ -31,9 +32,7 @@ interface EventUpdate {
 
 function when(iso: string): string {
   const d = new Date(iso);
-  const day = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
-  return `${day} · ${time}`;
+  return `${utcDate(d, { month: "short", day: "numeric" })} · ${utcTime(d)}`;
 }
 
 export default function UpdatesPage() {
@@ -229,7 +228,7 @@ export default function UpdatesPage() {
                       <div className="mt-3 flex flex-wrap items-center gap-3">
                         <span className="font-mono text-label text-muted">
                           {u.author.name}
-                          {u.author.org ? ` · ${u.author.org}` : ""} · {new Date(u.createdAt).toLocaleString()}
+                          {u.author.org ? ` · ${u.author.org}` : ""} · {utcDateTime(u.createdAt)}
                         </span>
                         {canPost ? (
                           <span className="ml-auto flex gap-2">

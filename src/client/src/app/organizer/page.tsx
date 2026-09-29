@@ -10,6 +10,7 @@ import { hue, STATUS_HUE, STATUS_LABEL, type HueName } from "@/lib/hues";
 import { Notice } from "@/components/ui/notice";
 import { StatusChip } from "@/components/ui/status-chip";
 import { EmptyState } from "@/components/ui/empty-state";
+import { utcDate, utcYear } from "@/lib/format";
 
 interface ManagedEvent {
   id: string;
@@ -37,16 +38,15 @@ function ago(iso: string): string {
   const days = Math.round(hours / 24);
   if (days === 1) return "yesterday";
   if (days < 7) return `${days} days ago`;
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return utcDate(iso);
 }
 
 function dates(event: ManagedEvent): string {
   if (!event.submissionsOpenAt && !event.submissionDeadline) return "dates to be announced";
-  const fmt = (iso: string) =>
-    new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const fmt = (iso: string) => utcDate(iso, { month: "short", day: "numeric" });
   const start = event.submissionsOpenAt ?? event.submissionDeadline!;
   const end = event.submissionDeadline ?? event.submissionsOpenAt!;
-  return `${fmt(start)}-${fmt(end)}, ${new Date(end).getFullYear()}`;
+  return `${fmt(start)}-${fmt(end)}, ${utcYear(end)} (UTC)`;
 }
 
 export default function OrganizerEventsPage() {

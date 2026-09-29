@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiBase, ApiError, del, get, patch, post } from "@/lib/api";
 import { Notice } from "@/components/ui/notice";
+import { utcTime } from "@/lib/format";
 
 interface Delivery {
   id: string;
@@ -283,7 +284,7 @@ export function EventIntegrations({ slug, canEdit }: { slug: string; canEdit: bo
                         </span>
                         <span className="text-muted">{d.action.toLowerCase()}</span>
                         {d.attempt > 1 ? <span className="text-muted">attempt {d.attempt}</span> : null}
-                        <span className="ml-auto text-muted">{new Date(d.createdAt).toLocaleTimeString()}</span>
+                        <span className="ml-auto text-muted">{utcTime(d.createdAt)}</span>
                       </div>
                     ))}
                   </div>
@@ -299,7 +300,7 @@ export function EventIntegrations({ slug, canEdit }: { slug: string; canEdit: bo
                         <span className="min-w-0 flex-1 truncate text-muted">
                           {q.attempts} attempt{q.attempts === 1 ? "" : "s"}
                           {q.lastError ? ` · ${q.lastError}` : ""}
-                          {q.status === "PENDING" ? ` · next ${new Date(q.nextAttemptAt).toLocaleTimeString()}` : ""}
+                          {q.status === "PENDING" ? ` · next ${utcTime(q.nextAttemptAt)}` : ""}
                         </span>
                         <button type="button" onClick={() => void retry(hook, q)} className="underline">
                           retry now

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError, get } from "@/lib/api";
 import { hue } from "@/lib/hues";
 import type { EventDetail } from "@/lib/types";
+import { usd } from "@/lib/format";
 
 interface Standing {
   rank: number;
@@ -34,11 +35,8 @@ interface Results {
 const PLACE = ["First place", "Second place", "Third place"];
 const PODIUM_HUE = ["amber", "slate", "coral"];
 
-function money(cents: number | null, currency: string): string {
-  if (cents === null) return "Non-cash prize";
-  return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(
-    cents / 100,
-  );
+function money(cents: number | null): string {
+  return cents === null ? "Non-cash prize" : usd(cents);
 }
 
 export default function WinnersPage() {
@@ -303,7 +301,7 @@ export default function WinnersPage() {
                           </div>
                         </div>
                         <span className="min-w-[88px] flex-none text-right font-mono text-small">
-                          {money(p.amountCents, p.currency)}
+                          {money(p.amountCents)}
                         </span>
                       </div>
                     );

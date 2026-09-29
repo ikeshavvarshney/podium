@@ -19,6 +19,7 @@ import type {
 } from "@/lib/types";
 import { isHttpUrl, normalizeUrl } from "@/lib/url";
 import { useNow } from "@/lib/use-now";
+import { utcDateTime, utcTime } from "@/lib/format";
 
 interface HistoryEntry {
   id: string;
@@ -104,7 +105,7 @@ const emptyDraft: Draft = {
 };
 
 const trim = (text: string, n: number) => (text.length > n ? `${text.slice(0, n - 1)}...` : text);
-const clock = (at: number) => new Date(at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+const clock = (at: number) => utcTime(at);
 
 export default function SubmitPage() {
   const params = useParams<{ slug: string }>();
@@ -273,8 +274,8 @@ export default function SubmitPage() {
   async function uploadTo(target: "thumbnail" | "gallery", file: File | undefined) {
     if (!file) return;
     const key = target === "thumbnail" ? "thumbnailUrl" : "images";
-    if (file.size > 2 * 1024 * 1024) {
-      setErrors((e) => ({ ...e, [key]: "Images can be up to 2 MB." }));
+    if (file.size > 20 * 1024 * 1024) {
+      setErrors((e) => ({ ...e, [key]: "Images can be up to 20 MB. They are resized before upload." }));
       return;
     }
     setUploading(target);
@@ -859,7 +860,7 @@ export default function SubmitPage() {
               onBlur={() => tidyUrl("thumbnailUrl")}
               disabled={locked}
               error={errors.thumbnailUrl}
-              help="A link to an image, or upload one below (PNG, JPEG, GIF or WebP, up to 2 MB)."
+              help="A link to an image, or upload one below (PNG, JPEG, GIF or WebP; large images are resized before upload)."
               placeholder="https://.../cover.png"
             />
             <label className={`btn btn-sm mt-2 inline-flex w-fit ${locked || uploading ? "pointer-events-none opacity-40" : "cursor-pointer"}`}>
@@ -1236,12 +1237,7 @@ export default function SubmitPage() {
                   className="-mx-2 grid gap-3 border-b border-line px-2 py-[11px] [grid-template-columns:78px_minmax(0,1fr)]"
                 >
                   <span className="font-mono text-meta leading-[1.4] text-muted">
-                    {new Date(entry.createdAt).toLocaleString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
+                    {utcDateTime(entry.createdAt, { month: "short", day: "numeric" })}
                   </span>
                   <div className="min-w-0">
                     <div className="text-small leading-[1.5]">{entry.summary}</div>

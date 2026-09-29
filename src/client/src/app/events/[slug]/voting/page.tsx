@@ -9,6 +9,7 @@ import { Notice } from "@/components/ui/notice";
 import { StatusChip } from "@/components/ui/status-chip";
 import { PageStatus } from "@/components/ui/page-status";
 import { Segmented } from "@/components/ui/segmented";
+import { utcDateTime } from "@/lib/format";
 
 interface VotingConfig {
   id: string | null;
@@ -501,7 +502,7 @@ export default function VotingManagerPage() {
                       {b.weight} · {b.credits}c
                     </span>
                     <span className="flex-none font-mono text-meta text-muted">
-                      {new Date(b.createdAt).toLocaleString()}
+                      {utcDateTime(b.createdAt)}
                     </span>
                   </div>
                 ))

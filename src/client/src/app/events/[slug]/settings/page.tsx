@@ -16,6 +16,7 @@ import { ShareLink } from "@/components/event/share-link";
 import { StatusChip } from "@/components/ui/status-chip";
 import { PageStatus } from "@/components/ui/page-status";
 import { Segmented } from "@/components/ui/segmented";
+import { toUtcInput, fromUtcInput } from "@/lib/format";
 
 interface Criterion {
   id?: string;
@@ -38,18 +39,9 @@ interface Rubric {
 
 const CRITERION_HUES = ["teal", "blue", "amber", "plum", "rose", "cyan", "coral", "green"];
 
-function toLocalInput(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+const toLocalInput = toUtcInput;
 
-function fromLocalInput(value: string): string | null {
-  if (!value) return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
-}
+const fromLocalInput = fromUtcInput;
 
 function keyFor(label: string, taken: Set<string>): string {
   const base =
@@ -459,7 +451,7 @@ export default function EventSettingsPage() {
               ] as const
             ).map(([key, label]) => (
               <label key={key} className="grid gap-[7px]">
-                <span className="text-ui font-medium">{label}</span>
+                <span className="text-ui font-medium">{label} (UTC)</span>
                 <input
                   type="datetime-local"
                   className={FIELD}
@@ -503,7 +495,8 @@ export default function EventSettingsPage() {
               />
             </label>
             <label className="grid gap-[7px]">
-              <span className="text-ui font-medium">Reviews per project</span>
+              <span className="text-ui font-medium">Judges per project</span>
+              <span className="text-small leading-[1.5] text-muted">Auto-balance fills to this. Manual assignment is not limited by it.</span>
               <input
                 type="number"
                 min={1}

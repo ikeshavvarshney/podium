@@ -11,6 +11,7 @@ import { apiBase, ApiError, get } from "@/lib/api";
 import { hue, initials, type HueName } from "@/lib/hues";
 import { formatDeadline } from "@/lib/participant-step";
 import type { EventStatus } from "@/lib/types";
+import { utcTime } from "@/lib/format";
 
 interface Progress {
   target: number;
@@ -460,7 +461,7 @@ export default function ManageEventPage() {
                 {audit.map((entry) => (
                   <li key={entry.id} className="m-0 grid gap-3.5 border-b border-line py-3 [grid-template-columns:52px_minmax(0,1fr)]">
                     <span className="font-mono text-meta text-muted">
-                      {new Date(entry.createdAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                      {utcTime(entry.createdAt)}
                     </span>
                     <div className="min-w-0">
                       <div className="text-ui leading-[1.5] [overflow-wrap:anywhere]">{entry.summary}</div>

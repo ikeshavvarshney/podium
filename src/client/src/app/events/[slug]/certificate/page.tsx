@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ScreenSkeleton } from "@/components/layout/screen-skeleton";
 import { ApiError, get } from "@/lib/api";
+import { utcDateTime } from "@/lib/format";
 
 interface Certificate {
   payload: {
@@ -114,7 +115,7 @@ export default function CertificatePage() {
           </p>
           <div className="mx-auto mt-10 h-px w-40 bg-line" />
           <p className="mt-4 font-mono text-meta text-muted">
-            Issued {new Date(payload.issuedAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
+            Issued {utcDateTime(payload.issuedAt, { year: "numeric", month: "long", day: "numeric" })}
           </p>
           <p className="mx-auto mt-6 max-w-[60ch] break-all font-mono text-label leading-[1.6] text-muted">
             {certificate.key.algorithm} · sha256 {certificate.hash}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError, del, get, patch, post } from "@/lib/api";
 import type { MyEventRow } from "@/lib/types";
+import { utcDate, utcTime } from "@/lib/format";
 
 interface Session {
   id: string;
@@ -42,8 +43,8 @@ function stamp(iso: string): string {
   const d = new Date(iso);
   const sameDay = new Date().toDateString() === d.toDateString();
   return sameDay
-    ? d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })
-    : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    ? utcTime(d)
+    : utcDate(d, { month: "short", day: "numeric" });
 }
 
 function ago(iso: string): string {
@@ -52,7 +53,7 @@ function ago(iso: string): string {
   if (mins < 60) return `last seen ${mins} min ago`;
   const hours = Math.round(mins / 60);
   if (hours < 24) return `last seen ${hours} hour${hours === 1 ? "" : "s"} ago`;
-  return `last seen ${new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+  return `last seen ${utcDate(iso, { month: "short", day: "numeric" })} (UTC)`;
 }
 
 function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
