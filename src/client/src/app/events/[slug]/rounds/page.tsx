@@ -10,6 +10,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { fromUtcInput, utcDateTime } from "@/lib/format";
+import { can } from "@/lib/permissions";
 
 type RoundKind = "QUIZ" | "SUBMISSION" | "SCORING" | "PITCH" | "VOTE" | "RESULT";
 
@@ -206,7 +207,7 @@ export default function RoundsPage() {
     );
   }
 
-  const canEdit = event.viewer.isEventAdmin;
+  const canEdit = can(event.viewer, "ROUNDS");
   const submissions = event._count?.submissions ?? 0;
   const teams = event._count?.teams ?? 0;
   const live = rounds.find((r) => stateOf(r, now) === "live");

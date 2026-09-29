@@ -19,6 +19,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Markdown } from "@/components/ui/markdown";
 import { usd, utcDateTime } from "@/lib/format";
 import { mediaUrl } from "@/lib/api";
+import { can } from "@/lib/permissions";
+import { eventNav } from "@/lib/event-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -234,7 +236,7 @@ export default async function EventPage({
           {viewer.isEventAdmin ? (
             <>
               <Link
-                href={`/events/${event.slug}/manage`}
+                href={eventNav(event).find((i) => i.key !== "overview")?.href ?? `/events/${event.slug}`}
                 className="btn-primary px-[18px] py-[11px] text-ui"
               >
                 Manage this event
@@ -365,7 +367,7 @@ export default async function EventPage({
           <GalleryGrid
             slug={event.slug}
             items={gallery.items}
-            isEventAdmin={viewer.isEventAdmin}
+            isEventAdmin={can(viewer, "SUBMISSIONS")}
             clearHref={galleryFiltered ? galleryHref(event.slug, {}) : undefined}
           />
         </div>

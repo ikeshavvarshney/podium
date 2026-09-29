@@ -17,6 +17,7 @@ import { StatusChip } from "@/components/ui/status-chip";
 import { PageStatus } from "@/components/ui/page-status";
 import { Segmented } from "@/components/ui/segmented";
 import { toUtcInput, fromUtcInput } from "@/lib/format";
+import { can } from "@/lib/permissions";
 
 interface Criterion {
   id?: string;
@@ -242,10 +243,11 @@ export default function EventSettingsPage() {
     );
   }
 
-  const canEdit = event.viewer.isEventAdmin;
+  const canEdit = can(event.viewer, "SETTINGS");
+  const canRubric = can(event.viewer, "JUDGING");
 
   // Settings are for event admins only. Anyone else gets the same refusal the API would give.
-  if (!canEdit) {
+  if (!event.viewer.isEventAdmin) {
     return (
       <PageStatus
         eyebrow="Event settings"
@@ -566,8 +568,8 @@ export default function EventSettingsPage() {
           value={mode}
           onChange={(id) => void saveMode(id, groupSize)}
           options={[
-            { id: "RUBRIC", label: "Weighted rubric", disabled: !canEdit || locked },
-            { id: "COMPARATIVE", label: "Comparative ranking", disabled: !canEdit || locked },
+            { id: "RUBRIC", label: "Weighted rubric", disabled: !canRubric || locked },
+            { id: "COMPARATIVE", label: "Comparative ranking", disabled: !canRubric || locked },
           ]}
         />
         {mode === "COMPARATIVE" ? (
@@ -584,7 +586,7 @@ export default function EventSettingsPage() {
               max={6}
               step={1}
               value={groupSize}
-              disabled={!canEdit || locked}
+              disabled={!canRubric || locked}
               onChange={(e) => setGroupSize(Number(e.target.value))}
               onMouseUp={() => void saveMode(mode, groupSize)}
               onKeyUp={() => void saveMode(mode, groupSize)}
@@ -609,7 +611,7 @@ export default function EventSettingsPage() {
         </div>
 
         <div className="mt-5">
-          <ScalePicker value={scale} onChange={setScale} disabled={locked || !canEdit} />
+          <ScalePicker value={scale} onChange={setScale} disabled={locked || !canRubric} />
         </div>
 
         {donut.length ? (
@@ -679,14 +681,14 @@ export default function EventSettingsPage() {
                 className="rounded-md border border-line bg-surface px-2.5 py-[7px] text-ui font-medium text-text outline-none focus:border-muted"
                 placeholder="Criterion name"
                 value={c.label}
-                disabled={locked || !canEdit}
+                disabled={locked || !canRubric}
                 onChange={(e) => updateCriterion(i, { label: e.target.value })}
               />
               <input
                 className="rounded-md border border-line bg-surface px-2.5 py-[7px] text-small text-muted outline-none focus:border-muted"
                 placeholder="What judges should look for"
                 value={c.hint ?? ""}
-                disabled={locked || !canEdit}
+                disabled={locked || !canRubric}
                 onChange={(e) => updateCriterion(i, { hint: e.target.value })}
               />
             </div>
@@ -697,7 +699,7 @@ export default function EventSettingsPage() {
                 max={100}
                 className="w-full rounded-md border border-line bg-surface px-2 py-[7px] font-mono text-ui text-text outline-none focus:border-muted"
                 value={c.weight}
-                disabled={locked || !canEdit}
+                disabled={locked || !canRubric}
                 onChange={(e) => updateCriterion(i, { weight: Number(e.target.value) })}
               />
               <span className="text-small text-muted">%</span>
@@ -706,7 +708,7 @@ export default function EventSettingsPage() {
               type="button"
               aria-label="Remove criterion"
               title="Remove criterion"
-              disabled={locked || !canEdit || criteria.length === 1}
+              disabled={locked || !canRubric || criteria.length === 1}
               onClick={() => setCriteria((prev) => prev.filter((_, j) => j !== i))}
               className="h-[34px] w-[34px] self-center rounded-md border border-line bg-surface text-body text-muted enabled:hover:border-danger enabled:hover:text-danger disabled:opacity-40"
             >
@@ -718,7 +720,7 @@ export default function EventSettingsPage() {
         <button
           type="button"
           onClick={addCriterion}
-          disabled={locked || !canEdit}
+          disabled={locked || !canRubric}
           className="mt-3.5 rounded-[10px] border border-dashed border-line px-3.5 py-[9px] text-small text-text hover:border-muted disabled:opacity-40"
         >
           + Add criterion
@@ -747,7 +749,7 @@ export default function EventSettingsPage() {
           <button
             type="button"
             onClick={() => void saveRubric()}
-            disabled={!weightOk || busy || locked || !canEdit}
+            disabled={!weightOk || busy || locked || !canRubric}
             title={weightOk ? undefined : "Weights must total 100%"}
             className="btn-primary disabled:opacity-40"
           >
@@ -758,7 +760,7 @@ export default function EventSettingsPage() {
       </section>
       )}
 
-      <EventIntegrations slug={slug} canEdit={canEdit} />
+      <EventIntegrations slug={slug} canEdit={can(event.viewer, "INTEGRATIONS")} />
     </main>
   );
 }

@@ -19,7 +19,6 @@ interface Progress {
     name: string;
     email: string;
     org: string | null;
-    trackScope: string[];
     assigned: number;
     completed: number;
     skipped: number;
@@ -222,7 +221,7 @@ export default function AssignPage() {
             {uncovered === 0
               ? `every submission has its ${progress.target} reviewers.`
               : `${uncovered} submission${uncovered === 1 ? " is" : "s are"} short of ${progress.target} reviewers.`}{" "}
-            A judge is never assigned their own team&apos;s project, and track scope is enforced on the server.
+            A judge is never assigned their own team&apos;s project; the server enforces it.
           </>
         }
         actions={
@@ -415,7 +414,7 @@ export default function AssignPage() {
       >
         <p className="m-0">
           {slotsToFill} review slot{slotsToFill === 1 ? " is" : "s are"} empty across {uncovered} project{uncovered === 1 ? "" : "s"}. Each is filled with
-          the least-loaded eligible judge. A judge is never given their own team&apos;s project, and track scope is respected.
+          the least-loaded eligible judge. A judge is never given their own team&apos;s project.
         </p>
         <p className="m-0 mt-2">Nothing is removed, and you can still change any single assignment afterwards.</p>
       </ConfirmDialog>

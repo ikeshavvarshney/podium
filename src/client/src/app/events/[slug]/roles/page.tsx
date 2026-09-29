@@ -10,11 +10,12 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Notice } from "@/components/ui/notice";
 import { PageStatus } from "@/components/ui/page-status";
 import { PageHeader } from "@/components/ui/page-header";
+import { can, EVENT_AREAS } from "@/lib/permissions";
 
 interface Membership {
   id: string;
   role: EventRole;
-  trackScope: string[];
+  permissions: string[];
   createdAt: string;
   user: { id: string; name: string; email: string; org: string | null; avatarHue: string };
 }
@@ -23,12 +24,11 @@ const ROLE_COPY: Record<EventRole, { title: string; blurb: string }> = {
   ADMIN: {
     title: "Admins",
     blurb:
-      "Full organizer access to this event: settings, rubric, assignments, results. Added directly, with no application step.",
+      "Organizer access to this event, limited to the areas you allow or full access. Added directly, with no application step.",
   },
   JUDGE: {
     title: "Judges with access",
-    blurb:
-      "A judge sees only the projects assigned to them. Track scope narrows that further, and the server enforces both.",
+    blurb: "A judge sees and scores only the projects the organizers assign to them.",
   },
   PARTICIPANT: {
     title: "Participants",
@@ -48,7 +48,8 @@ export default function ManageRolesPage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<EventRole>("JUDGE");
   const [busy, setBusy] = useState(false);
-  const [scopeFor, setScopeFor] = useState<Membership | null>(null);
+  const [accessFor, setAccessFor] = useState<Membership | null>(null);
+  const [accessError, setAccessError] = useState("");
   const [revoking, setRevoking] = useState<Membership | null>(null);
   const [revokeBusy, setRevokeBusy] = useState(false);
 
@@ -79,10 +80,19 @@ export default function ManageRolesPage() {
     setGrantError("");
     setNotice("");
     try {
-      await post(`/events/${slug}/members`, { email: email.trim().toLowerCase(), role });
+      const created = await post<Membership>(`/events/${slug}/members`, {
+        email: email.trim().toLowerCase(),
+        role,
+        ...(role === "ADMIN" ? { permissions: [] } : {}),
+      });
       setEmail("");
-      setNotice(`${role === "ADMIN" ? "Admin" : "Judge"} access granted.`);
       await load();
+      if (role === "ADMIN") {
+        setNotice("Admin added with no access yet. Choose what they can do.");
+        setAccessFor({ ...created, permissions: [] });
+      } else {
+        setNotice("Judge access granted.");
+      }
     } catch (err) {
       setGrantError(err instanceof ApiError ? err.message : "That role could not be granted.");
     } finally {
@@ -104,18 +114,14 @@ export default function ManageRolesPage() {
     }
   }
 
-  async function toggleTrack(membership: Membership, trackId: string) {
-    const next = membership.trackScope.includes(trackId)
-      ? membership.trackScope.filter((t) => t !== trackId)
-      : [...membership.trackScope, trackId];
+  async function saveAccess(membership: Membership, permissions: string[]) {
+    setAccessError("");
     try {
-      await patch(`/events/${slug}/members/${membership.id}`, { trackScope: next });
-      setScopeFor({ ...membership, trackScope: next });
-      setMembers((prev) =>
-        prev.map((m) => (m.id === membership.id ? { ...m, trackScope: next } : m)),
-      );
+      const updated = await patch<Membership>(`/events/${slug}/members/${membership.id}`, { permissions });
+      setAccessFor({ ...membership, permissions: updated.permissions });
+      setMembers((prev) => prev.map((m) => (m.id === membership.id ? { ...m, permissions: updated.permissions } : m)));
     } catch (err) {
-      setGrantError(err instanceof ApiError ? err.message : "Track scope could not be updated.");
+      setAccessError(err instanceof ApiError ? err.message : "Access could not be updated.");
     }
   }
 
@@ -138,6 +144,14 @@ export default function ManageRolesPage() {
   }
 
   const byRole = (r: EventRole) => members.filter((m) => m.role === r);
+  const fullAccess = event.viewer.fullAccess ?? event.viewer.isEventAdmin;
+  const isOwnerRow = (m: Membership) => m.role === "ADMIN" && m.user.id === event.owner.id;
+  const accessLabel = (m: Membership) =>
+    isOwnerRow(m)
+      ? "owner · full access"
+      : m.permissions.includes("ALL")
+        ? "full access"
+        : `${m.permissions.length} of ${EVENT_AREAS.length} areas`;
 
   return (
     <main className="screen max-w-[900px] pt-[clamp(26px,4vw,40px)] pb-[120px]">
@@ -165,7 +179,7 @@ export default function ManageRolesPage() {
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          {(["JUDGE", "ADMIN"] as EventRole[]).map((r) => {
+          {((fullAccess ? ["JUDGE", "ADMIN"] : ["JUDGE"]) as EventRole[]).map((r) => {
             const on = role === r;
             const h = hue(ROLE_HUE[r]!);
             return (
@@ -218,7 +232,6 @@ export default function ManageRolesPage() {
               <div className="mt-3.5 grid">
                 {rows.map((m) => {
                   const h = hue(m.user.avatarHue);
-                  const scoped = m.trackScope.length > 0;
                   return (
                     <div key={m.id} className="flex flex-wrap items-center gap-x-3.5 gap-y-2 border-b border-line py-[11px]">
                       <span
@@ -234,17 +247,19 @@ export default function ManageRolesPage() {
                           {m.user.email}
                         </div>
                       </div>
-                      {r === "JUDGE" ? (
+                      {r === "ADMIN" ? (
                         <>
                           <span className="hidden flex-none font-mono text-label uppercase tracking-stamp text-muted sm:inline">
-                            {scoped ? `${m.trackScope.length} track${m.trackScope.length > 1 ? "s" : ""}` : "all tracks"}
+                            {accessLabel(m)}
                           </span>
-                          <button type="button" onClick={() => setScopeFor(m)} className="btn btn-sm flex-none">
-                            Manage access
-                          </button>
+                          {fullAccess && !isOwnerRow(m) ? (
+                            <button type="button" onClick={() => setAccessFor(m)} className="btn btn-sm flex-none">
+                              Manage access
+                            </button>
+                          ) : null}
                         </>
                       ) : null}
-                      {r === "PARTICIPANT" ? null : (
+                      {r === "PARTICIPANT" || (r === "ADMIN" && (!fullAccess || isOwnerRow(m))) ? null : (
                         <button
                           type="button"
                           onClick={() => setRevoking(m)}
@@ -262,74 +277,78 @@ export default function ManageRolesPage() {
         );
       })}
 
-      {scopeFor ? (
-        <div
-          onClick={() => setScopeFor(null)}
-          className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-6"
-        >
+      {accessFor ? (
+        <div onClick={() => setAccessFor(null)} className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-6">
           <div
             role="dialog"
             aria-modal="true"
-            aria-labelledby="scope-title"
+            aria-labelledby="access-title"
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-[420px] rounded-[14px] border border-line bg-surface p-[clamp(20px,3vw,26px)]"
+            className="max-h-[86dvh] w-full max-w-[460px] overflow-y-auto rounded-[14px] border border-line bg-surface p-[clamp(20px,3vw,26px)]"
             style={{ animation: "pop 320ms cubic-bezier(0.16,1,0.3,1) both" }}
           >
             <div className="flex items-center justify-between gap-3">
-              <h2 id="scope-title" className="text-title font-semibold tracking-head">Manage access</h2>
-              <button
-                type="button"
-                aria-label="Close"
-                onClick={() => setScopeFor(null)}
-                className="p-1 text-heading leading-none text-muted"
-              >
+              <h2 id="access-title" className="text-title font-semibold tracking-head">Manage access</h2>
+              <button type="button" aria-label="Close" onClick={() => setAccessFor(null)} className="p-1 text-heading leading-none text-muted">
                 ×
               </button>
             </div>
-            <div className="mt-1.5 font-mono text-small text-muted">{scopeFor.user.email}</div>
-            <p className="mt-3 text-small leading-[1.55] text-muted">
-              With nothing selected this judge may be assigned any track. Selecting tracks restricts both assignment and
-              what the API will return to them.
-            </p>
-
-            <div className="mt-4 grid border-t border-line">
-              {event.tracks.length === 0 ? (
-                <div className="py-3 text-small text-muted">This event has no tracks.</div>
-              ) : (
-                event.tracks.map((t) => {
-                  const on = scopeFor.trackScope.includes(t.id);
-                  return (
-                    <div key={t.id} className="flex items-center gap-4 border-b border-line py-[13px]">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-ui">{t.name}</div>
-                        <div className="text-small leading-[1.5] text-muted">
-                          {t.restricted ? "Restricted track" : "Open track"}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={on}
-                        aria-label={`Allow ${t.name}`}
-                        onClick={() => void toggleTrack(scopeFor, t.id)}
-                        className="relative h-6 w-[42px] flex-none rounded-full border p-0 [transition:background-color_420ms_cubic-bezier(0.33,1,0.68,1)_60ms,border-color_260ms]"
-                        style={{
-                          background: on ? "var(--ac)" : "var(--el)",
-                          borderColor: on ? "var(--ac)" : "var(--ln)",
-                        }}
-                      >
-                        <span
-                          className="absolute top-[2px] h-[18px] w-[18px] rounded-full [transition:left_260ms_cubic-bezier(0.16,1,0.3,1)]"
-                          style={{ left: on ? "21px" : "2px", background: on ? "var(--bg)" : "var(--mu)" }}
-                        />
-                      </button>
-                    </div>
-                  );
-                })
-              )}
+            <div className="mt-1.5 text-small text-muted">
+              {accessFor.user.name} · <span className="font-mono">{accessFor.user.email}</span>
             </div>
 
-            <button type="button" onClick={() => setScopeFor(null)} className="btn-primary mt-[18px] w-full">
+            {(() => {
+              const full = accessFor.permissions.includes("ALL");
+              const rows = [
+                { id: "ALL", label: "Full access", hint: "Everything an organizer can do, including managing other admins." },
+                ...EVENT_AREAS,
+              ];
+              return (
+                <div className="mt-4 grid border-t border-line">
+                  {rows.map((area) => {
+                    const on = full || accessFor.permissions.includes(area.id);
+                    const locked = full && area.id !== "ALL";
+                    return (
+                      <div key={area.id} className="flex items-center gap-4 border-b border-line py-3" style={{ opacity: locked ? 0.55 : 1 }}>
+                        <div className="min-w-0 flex-1">
+                          <div className={`text-ui ${area.id === "ALL" ? "font-semibold" : ""}`}>{area.label}</div>
+                          <div className="text-small leading-[1.5] text-muted">{area.hint}</div>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={on}
+                          aria-label={area.label}
+                          disabled={locked}
+                          onClick={() => {
+                            const next =
+                              area.id === "ALL"
+                                ? full
+                                  ? []
+                                  : ["ALL"]
+                                : on
+                                  ? accessFor.permissions.filter((p) => p !== area.id)
+                                  : [...accessFor.permissions, area.id];
+                            void saveAccess(accessFor, next);
+                          }}
+                          className="relative h-6 w-[42px] flex-none rounded-full border p-0 [transition:background-color_420ms_cubic-bezier(0.33,1,0.68,1)_60ms,border-color_260ms] disabled:cursor-not-allowed"
+                          style={{ background: on ? "var(--ac)" : "var(--el)", borderColor: on ? "var(--ac)" : "var(--ln)" }}
+                        >
+                          <span
+                            className="absolute top-[2px] h-[18px] w-[18px] rounded-full [transition:left_260ms_cubic-bezier(0.16,1,0.3,1)]"
+                            style={{ left: on ? "21px" : "2px", background: on ? "var(--bg)" : "var(--mu)" }}
+                          />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {accessError ? <p className="mt-2 text-small text-danger">{accessError}</p> : null}
+            <p className="mt-3 text-small leading-[1.5] text-muted">Changes save as you switch them. The server checks every request.</p>
+            <button type="button" onClick={() => setAccessFor(null)} className="btn-primary mt-[14px] w-full">
               Done
             </button>
           </div>

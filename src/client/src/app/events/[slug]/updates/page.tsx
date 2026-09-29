@@ -8,6 +8,7 @@ import { hue, type HueName } from "@/lib/hues";
 import type { EventDetail } from "@/lib/types";
 import { Notice } from "@/components/ui/notice";
 import { utcDate, utcDateTime, utcTime } from "@/lib/format";
+import { can } from "@/lib/permissions";
 
 type UpdateTag = "ROUNDS" | "DEADLINE" | "JUDGING" | "LOGISTICS" | "VOTING";
 
@@ -134,7 +135,7 @@ export default function UpdatesPage() {
     );
   }
 
-  const canPost = event.viewer.isEventAdmin;
+  const canPost = can(event.viewer, "UPDATES");
   const unread = updates.filter((u) => !u.read).length;
 
   return (
